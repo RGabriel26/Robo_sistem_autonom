@@ -32,32 +32,34 @@ brat_control.h:
 ================================================================================
 */
 
-// ANTENA
-// log data pentru conectarea la statiile remote
+// date de conectare pentru statii
 const char* ssid_statie[] = {"", "Statia_A", "Statia_B", "Statia_C"}; // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
 const char* password_statie[] = {"", "12345678", "12345678", "12345678"};
 
-// variabile pentru determinarea unghioului de orientare al antenei
-int interval[2] = {LIM_INF , LIM_SUP}; // interval cu unghiurile pe care le va explora antena
-Servo servoAntena; // instanta servo de control al servomotorului antenei
+// instante servo
+Servo servoAntena; // pentru antena
+Servo servoBase;   // pentru brat - servo de la baza    - miscare verticala
+Servo servoHead;   // pentru brat - servo de la efector - miscare orizontala
 
-// BRAT APUCATOR
-Servo servoBase;
-Servo servoHead;
-
-// Variabile globale
+// variabile globale
 // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
-enum StareComportamet{
+enum StareComportament{
   STARE_VERIFICARE_PREZENTA_OBIECT,
   STARE_ZONA_A,
   STARE_ZONA_B, 
   STARE_ZONA_C, 
   STARE_REPAUS
 };
+volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
+volatile int prezentaObiect = 0;                    // pentru stocarea prezentei obiectului din ZONA_A
+volatile int valoareRSSI = 0;                       // valoare obtinuta din det_unghi_orientare si folosita pentru determinarea proximitatii fata de o ZONA
+volatile int interval[2] = {LIM_INF , LIM_SUP};     // interval cu unghiurile pe care le va explora antena
 
-volatile int statieCurenta = 0;   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
-volatile int prezentaObiect = 0;  // pentru stocarea prezentei obiectului din ZONA_A
-volatile int valoareRSSI = 0;     // valoare obtinuta din det_unghi_orientare si folosita pentru determinarea proximitatii fata de o ZONA
+StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; 
+
+TaskHandle_t handleTaskDeplasare_Urmarire = NULL;
+TaskHandle_t handleTaskDeplasare_CautareStationara = NULL;
+TaskHandle_t handleTaskDeplasare_PozitionareObiect = NULL; 
 
 void setup() {
   // setare UART 0 in cazul debugging ului
@@ -88,14 +90,14 @@ void setup() {
   servoAntena.write(90);
   init_brat();
   // Initializare statia A
-  statieCurenta = 1; // conectare la statia A (pickup obiect)
-  delay(1000);       // delay 1 sec pentru asteptarea verificarii prezentei obiectului
+  conectareStatie = 1; // conectare la statia A (pickup obiect)
+  delay(1000);         // delay 1 sec pentru asteptarea verificarii prezentei obiectului
 
   // initializare tasks
   // TEST
   xTaskCreatePinnedToCore(
-    taskAntena,       // funcția
-    "TaskAntena",     // nume task
+    taskControl_servoAntena,       // funcția
+    "taskControl_servoAntena",     // nume task
     4096,             // stack size
     NULL,             // parametru
     1,                // prioritate
@@ -104,12 +106,32 @@ void setup() {
   );
 
   xTaskCreatePinnedToCore(
-    taskControl_TEST,
-    "TaskControl_TEST",
+    taskControl_Deplasare_Urmarire,
+    "taskControl_Deplasare_Urmarire",
     4096,
     NULL,
     1,
+    &handleTaskDeplasare_Urmarire,
+    1               // rulează pe core 1
+  );
+
+  xTaskCreatePinnedToCore(
+    taskControl_Deplasare_CautareStationare,
+    "taskControl_Deplasare_CautareStationare",
+    4096,
     NULL,
+    2,
+    &handleTaskDeplasare_CautareStationara,
+    1               // rulează pe core 1
+  );
+
+  xTaskCreatePinnedToCore(
+    taskControl_Deplasare_PozitionareObiect,
+    "taskControl_Deplasare_PozitionareObiect",
+    4096,
+    NULL,
+    2,
+    &handleTaskDeplasare_PozitionareObiect,
     1               // rulează pe core 1
   );
 
@@ -117,50 +139,39 @@ void setup() {
   digitalWrite(pinPWM, HIGH);
 }
 
-// Task 1: Verificare conexiune si orientare antena
-void taskAntena(void *parameter) {
+// Task 1: Verificare conexiune si orientarea antenei spre sursa de semnal wifi
+void taskControl_servoAntena(void *parameter) {
   while (true) {
-    if (WiFi.status() != WL_CONNECTED) { // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
-      servoAntena.write(90);             // pozitionare antena in pozitie default
-      connect_statie(ssid_statie[statieCurenta], password_statie[statieCurenta]); // conectare la statia curenta
+    if (WiFi.status() != WL_CONNECTED) {                                          // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
+      servoAntena.write(90);                                                      // pozitionare antena in pozitie default
+      connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]); // conectare la statia curenta
     } else {
+      // verificare prezentaObiect
+
+      // determinarea unghiului de orientare spre sursa de semnal
       valoareRSSI = det_unghi_orientare();
-      Serial.println(det_unghi_orientare());
+      Serial.println(det_unghi_orientare()); // FOLOSIT PENTRU TEST
     }
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
 
-// Task 2: Control motoare si brat robotic
-void taskControl_TEST(void *parameter) {
-  int valoare = 0;
+// Task 2: Control motoarelor pentru a duce unghiul de orientare spre zona tampon de mers inainte
+void taskControl_Deplasare_Urmarire(void *parameter) {
   while (true) {
-    if (Serial.available() > 0) {
-      valoare = Serial.parseInt();
-      if (valoare != '\n' && valoare != '\r' && valoare != '\0') {
-        switch (valoare) {
-          case 1: FORWARD(); break;
-          case 2: BACK(); break;
-          case 3: LEFT(); break;
-          case 4: RIGHT(); break;
-          case 5: VERTICAL_LEFT(); break;
-          case 6: VERTICAL_RIGHT(); break;
-          case 7: brat_prindere(); break;
-          case 8: brat_eliberare(); break;
-          case 9: STOP(); break;
-          default: STOP(); break;
-        }
-      }
-    } else LEFT();
-    int dataUART = 0;
-    if (Serial1.available() > 0) {
-      dataUART = Serial1.parseInt();
-      switch (dataUART) {
-        case 1: brat_prindere(); break;
-        case 2: brat_eliberare(); break;
-        default: break;
-      }
-    }
+
+    vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
+  }
+}
+void taskControl_Deplasare_CautareStationare(void *parameter) {
+  while (true) {
+
+    vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
+  }
+}
+void taskControl_Deplasare_PozitionareObiect(void *parameter) {
+  while (true) {
+
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
@@ -174,24 +185,70 @@ void loop() {
       // NU
         // CAUTARE_ZONA_C
   // CAUTARE_ZONA_A
-      // - deplasare
+      // - conectare STATIE_A
       // - verificare proximitate
       // - detectie
       // - prindere obiect
       // - rotire
       // - CAUTARE_ZONA_B
   // CAUTARE_ZONA_B
-      // - deplasare 
+      // - conectare STATIE_B
       // - verificare proximitate
       // - eliberare obiect
       // - rotire
       // - VERIFICARE_OBIECT
   // CAUTARE_ZONA_C
-      // - deplasare 
+      // - conectare STATIE_C
       // - verificare proximitate
       // - veridicare prezenta obiect din zona A
         // REPAUS
-          // - conectare la zona A
+          // - conectare la STATIE_A
           // - asteptare prezentaObiect = true
           // CAUTARE_ZONA_A
+
+  switch (stareComport_Robot) {
+    // -----------------------------------------------------------------------------
+    case STARE_VERIFICARE_PREZENTA_OBIECT: 
+      if(prezentaObiect)
+        stareComport_Robot = STARE_ZONA_A;
+      else
+        stareComport_Robot = STARE_ZONA_C;
+      break;
+    // -----------------------------------------------------------------------------
+    case STARE_ZONA_A:
+        conectareStatie = 1; // conectare STATIE_A
+        // verificare proximitate sau detectie obiect
+        if (valoareRSSI < 35 ){   // ajuns in zona de proximitate a statiei A
+            // daca se ajunge aici inseamna ca robotul nu a reusit sa detecteze obiectul
+            // se executa miscari stanga dreapta in speranta detectiei obiectului
+              // oprire taskControl_DeplasareUrmarire pentru a se activa taskControl_DeplasareCautareStationare
+            vTaskSuspend(handleTaskDeplasare_Urmarire);
+            vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+            vTaskResume(handleTaskDeplasare_CautareStationara);
+        }else{
+          // mentinere taskControl_DeplasareUrmarire
+            vTaskSuspend(handleTaskDeplasare_CautareStationara);
+            vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+            vTaskResume(handleTaskDeplasare_Urmarire);
+        }
+
+        
+
+
+        conectareStatie = 2; // conectare STATIE_B
+      break;
+    // -----------------------------------------------------------------------------
+    case STARE_ZONA_B: 
+
+      break;
+    // -----------------------------------------------------------------------------
+    case STARE_ZONA_C: 
+
+      break;
+    // -----------------------------------------------------------------------------
+    case STARE_REPAUS:
+
+      break;
+  }
+    
 }

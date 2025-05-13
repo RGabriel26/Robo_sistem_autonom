@@ -14,7 +14,7 @@
 #define LIM_SUP 160
 
 // variabile externe - definite în .ino
-extern int interval[2];
+extern volatile int interval[2];
 extern Servo servoAntena;
 
 void connect_statie(const char* ssid, const char* password) {
