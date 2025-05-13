@@ -46,9 +46,18 @@ Servo servoBase;
 Servo servoHead;
 
 // Variabile globale
-volatile int statieCurenta = 0;
-volatile int prezentaObiect = 0;
-volatile int valoareRSSI = 0;
+// enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
+enum StareComportamet{
+  STARE_VERIFICARE_PREZENTA_OBIECT,
+  STARE_ZONA_A,
+  STARE_ZONA_B, 
+  STARE_ZONA_C, 
+  STARE_REPAUS
+};
+
+volatile int statieCurenta = 0;   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
+volatile int prezentaObiect = 0;  // pentru stocarea prezentei obiectului din ZONA_A
+volatile int valoareRSSI = 0;     // valoare obtinuta din det_unghi_orientare si folosita pentru determinarea proximitatii fata de o ZONA
 
 void setup() {
   // setare UART 0 in cazul debugging ului
@@ -157,34 +166,32 @@ void taskControl_TEST(void *parameter) {
 }
 
 void loop() {
-  // FUNCTIA LOOP NU TREBUIE LASATA SA RULEZE LA INFINIT, AI NEVOIE DE FUNCTII BLOCANTE PENTRU A PASTRA O LOGICA DESFASURATA IN TIMP
-
-  // statie initializata in functia setup - staita A
-  // verificare daca este facuta conectiunea cu staita A
-  if (prezentaObiect){
-    // mentinerea conectiunii cu statia A
-    // logica de comanda pentru deplasarea spre aceas zona
-    // verificare proximitate
-
-    // verificare detectie obiect pentru switch al controlului folosind datele din detectie pentru centrare
-        // obiect in pozitia corecta
-            // prindere
-            // rotarie 180
-            // conectare zona B
-            // break if actual
-  }else{
-    statieCurenta = 3 // conectare la statia C (repaus)
-    // logica de comanda pentru deplasare spre zona respectiva
-    // verificare proximitate
-    // conectare staie A
-    // stop - verificare pentru prezentaObiect
-  }
-
-  // logica pentru pasul de deplasare spre zona B
-  // verificare proximitate fata de zona B
-      // decuplare obiect
-      // comada in spate + rotatie 180 de grade
-
-
-  // DEFALCHEAZA LOGICA DE MAI SUS INTR UN SWITCH DE STARI - ALEATORIU MASINA DE STARE
+  // ROBOTUL IN TIMPUL INITIALIZARII, INCEARCA CONECTAREA LA ZONA A
+  // LA PRIMA EXECUTIEI A FUNCTIEI LOOP AR TREBUI CA VARIABILA prezentaObiect SA FIE DEJA POPULATA SAU NU
+  // VERIFICARE_OBIECT
+      // DA
+        // CAUTARE_ZONA_A
+      // NU
+        // CAUTARE_ZONA_C
+  // CAUTARE_ZONA_A
+      // - deplasare
+      // - verificare proximitate
+      // - detectie
+      // - prindere obiect
+      // - rotire
+      // - CAUTARE_ZONA_B
+  // CAUTARE_ZONA_B
+      // - deplasare 
+      // - verificare proximitate
+      // - eliberare obiect
+      // - rotire
+      // - VERIFICARE_OBIECT
+  // CAUTARE_ZONA_C
+      // - deplasare 
+      // - verificare proximitate
+      // - veridicare prezenta obiect din zona A
+        // REPAUS
+          // - conectare la zona A
+          // - asteptare prezentaObiect = true
+          // CAUTARE_ZONA_A
 }
