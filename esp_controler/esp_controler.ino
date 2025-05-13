@@ -6,8 +6,6 @@
 #include <Arduino.h>
 #include "driver/ledc.h"
 
-// test git
-
 /*
 ================================================================================
  FUNCȚII DISPONIBILE ÎN FIȘIERELE HEADER IMPORTATE
@@ -36,12 +34,9 @@ brat_control.h:
 
 // ANTENA
 // log data pentru conectarea la statiile remote
-const char* ssid_station_A = "Statia_A";
-const char* password_station_A = "12345678";
-const char* ssid_station_B = "Statia_B";
-const char* password_station_B = "12345678";
-const char* ssid_station_C = "Statia_C";
-const char* password_station_C = "12345678";
+const char* ssid_statie[] = {"", "Statia_A", "Statia_B", "Statia_C"}; // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
+const char* password_statie[] = {"", "12345678", "12345678", "12345678"};
+
 // variabile pentru determinarea unghioului de orientare al antenei
 int interval[2] = {LIM_INF , LIM_SUP}; // interval cu unghiurile pe care le va explora antena
 Servo servoAntena; // instanta servo de control al servomotorului antenei
@@ -49,6 +44,11 @@ Servo servoAntena; // instanta servo de control al servomotorului antenei
 // BRAT APUCATOR
 Servo servoBase;
 Servo servoHead;
+
+// Variabile globale
+volatile int statieCurenta = 0;
+volatile int prezentaObiect = 0;
+volatile int valoareRSSI = 0;
 
 void setup() {
   // setare UART 0 in cazul debugging ului
@@ -78,6 +78,9 @@ void setup() {
   delay(100);
   servoAntena.write(90);
   init_brat();
+  // Initializare statia A
+  statieCurenta = 1; // conectare la statia A (pickup obiect)
+  delay(1000);       // delay 1 sec pentru asteptarea verificarii prezentei obiectului
 
   // initializare tasks
   // TEST
@@ -92,8 +95,8 @@ void setup() {
   );
 
   xTaskCreatePinnedToCore(
-    taskControl,
-    "TaskControl",
+    taskControl_TEST,
+    "TaskControl_TEST",
     4096,
     NULL,
     1,
@@ -108,11 +111,11 @@ void setup() {
 // Task 1: Verificare conexiune si orientare antena
 void taskAntena(void *parameter) {
   while (true) {
-    if (WiFi.status() != WL_CONNECTED) {
-      servoAntena.write(90);
-      connect_statie(ssid_station_C, password_station_C);
+    if (WiFi.status() != WL_CONNECTED) { // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
+      servoAntena.write(90);             // pozitionare antena in pozitie default
+      connect_statie(ssid_statie[statieCurenta], password_statie[statieCurenta]); // conectare la statia curenta
     } else {
-      Serial.print("valoare unghi: ");
+      valoareRSSI = det_unghi_orientare();
       Serial.println(det_unghi_orientare());
     }
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
@@ -120,7 +123,7 @@ void taskAntena(void *parameter) {
 }
 
 // Task 2: Control motoare si brat robotic
-void taskControl(void *parameter) {
+void taskControl_TEST(void *parameter) {
   int valoare = 0;
   while (true) {
     if (Serial.available() > 0) {
@@ -153,6 +156,35 @@ void taskControl(void *parameter) {
   }
 }
 
-
 void loop() {
+  // FUNCTIA LOOP NU TREBUIE LASATA SA RULEZE LA INFINIT, AI NEVOIE DE FUNCTII BLOCANTE PENTRU A PASTRA O LOGICA DESFASURATA IN TIMP
+
+  // statie initializata in functia setup - staita A
+  // verificare daca este facuta conectiunea cu staita A
+  if (prezentaObiect){
+    // mentinerea conectiunii cu statia A
+    // logica de comanda pentru deplasarea spre aceas zona
+    // verificare proximitate
+
+    // verificare detectie obiect pentru switch al controlului folosind datele din detectie pentru centrare
+        // obiect in pozitia corecta
+            // prindere
+            // rotarie 180
+            // conectare zona B
+            // break if actual
+  }else{
+    statieCurenta = 3 // conectare la statia C (repaus)
+    // logica de comanda pentru deplasare spre zona respectiva
+    // verificare proximitate
+    // conectare staie A
+    // stop - verificare pentru prezentaObiect
+  }
+
+  // logica pentru pasul de deplasare spre zona B
+  // verificare proximitate fata de zona B
+      // decuplare obiect
+      // comada in spate + rotatie 180 de grade
+
+
+  // DEFALCHEAZA LOGICA DE MAI SUS INTR UN SWITCH DE STARI - ALEATORIU MASINA DE STARE
 }

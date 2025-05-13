@@ -12,7 +12,7 @@
 #define POZ_SERVO_BASE_DEFAULT 35
 #define POZ_SERVO_HEAD_DEFAULT 20
 #define POZ_SERVO_BASE_RIDICAT 17
-#define POZ_SERVO_HEAD_RIDICAT 50
+#define POZ_SERVO_HEAD_RIDICAT 60
 
 // variabile externe - definite în .ino
 extern Servo servoBase;
