@@ -1,3 +1,4 @@
+#include "esp32-hal.h"
 #ifndef MOTOARE_H
 #define MOTOARE_H
 
@@ -19,7 +20,7 @@
 // pin pebtru PWM 
 #define pinPWM 21 
 
-void FORWARD() {
+void motoare_deplasareFata() {
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -30,7 +31,7 @@ void FORWARD() {
   digitalWrite(DRIVER_B_IN4, LOW);
 }
 
-void BACK() {
+void motoare_deplasareSpate() {
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -41,7 +42,7 @@ void BACK() {
   digitalWrite(DRIVER_B_IN4, HIGH);
 }
 
-void LEFT() {
+void motoare_rotireStanga() {
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -52,7 +53,7 @@ void LEFT() {
   digitalWrite(DRIVER_B_IN4, HIGH);
 }
 
-void RIGHT() {
+void motoare_rotireDreapta() {
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -63,7 +64,7 @@ void RIGHT() {
   digitalWrite(DRIVER_B_IN4, LOW);
 }
 
-void VERTICAL_LEFT() {
+void motoare_verticalStanga() {
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -74,7 +75,7 @@ void VERTICAL_LEFT() {
   digitalWrite(DRIVER_B_IN4, LOW);
 }
 
-void VERTICAL_RIGHT() {
+void motoare_verticalDreapta() {
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -85,7 +86,7 @@ void VERTICAL_RIGHT() {
   digitalWrite(DRIVER_B_IN4, HIGH);
 }
 
-void STOP() {
+void motoare_stop() {
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -94,6 +95,13 @@ void STOP() {
   digitalWrite(DRIVER_B_IN2, LOW);
   digitalWrite(DRIVER_B_IN3, LOW);
   digitalWrite(DRIVER_B_IN4, LOW);
+}
+
+void motoare_executieRetragere(){
+  motoare_deplasareSpate();
+  delay(500);
+  motoare_rotireDreapta();
+  delay(1000);
 }
 
 #endif
