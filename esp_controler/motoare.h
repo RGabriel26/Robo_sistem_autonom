@@ -1,4 +1,3 @@
-#include "esp32-hal.h"
 #ifndef MOTOARE_H
 #define MOTOARE_H
 
