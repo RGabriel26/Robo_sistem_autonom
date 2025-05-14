@@ -56,13 +56,14 @@ enum StareComportament{
 volatile int interval[2] = {LIM_INF , LIM_SUP};     // interval cu unghiurile pe care le va explora antena
 volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
 volatile int prezentaObiect_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
-volatile int valoareRSSI_unghiMAX = 0;              // valoare RSSI corezpunzatoare unghiului de orientare obtinuta din det_unghi_orientare si folosita pentru determinarea proximitatii fata de o ZONA
+volatile int unghiProvenienta = 0;              // valoare RSSI corezpunzatoare unghiului de orientare obtinuta din det_unghi_orientare si folosita pentru determinarea proximitatii fata de o ZONA
 volatile int obiect_detectat = 0;
 volatile int obiect_x = 0;
 volatile int obiect_y = 0;
 volatile int obiect_w = 0; 
 volatile int obiect_h = 0;
-portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;    // mutex pentru blocarea accesului la o structura de cod - folosit pentru scriere/citire variabile globale
+portMUX_TYPE muxUART = portMUX_INITIALIZER_UNLOCKED;    // mutex pentru blocarea accesului la o structura de cod - folosit pentru scriere/citire variabile globale
+portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;
 
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; // instanta a structurii de date enum StareComportament
 
@@ -173,7 +174,9 @@ void taskControl_servoAntena(void *parameter) {
 
       // determinarea unghiului de orientare spre sursa de semnal
 
-      valoareRSSI_unghiMAX = det_unghi_orientare();
+      portENTER_CRITICAL(&muxRSSI);
+      unghiProvenienta = det_unghi_orientare();
+      portEXIT_CRITICAL(&muxRSSI);
       Serial.println(det_unghi_orientare()); // FOLOSIT PENTRU TEST
     }
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
@@ -183,15 +186,32 @@ void taskControl_servoAntena(void *parameter) {
 // Task 2: Control motoarelor pentru a duce unghiul de orientare spre zona tampon de mers inainte
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
+  int unghiProvenienta_local = 0;
   while (true) {
+    // protectie la citire
+    portENTER_CRITICAL(&muxRSSI);
+    unghiProvenienta_local = unghiProvenienta;
+    portEXIT_CRITICAL(&muxRSSI);
 
+  if (unghiProvenienta_local >= 70 && unghiProvenienta_local <= 110) {
+    motoare_deplasareFata();
+  } else if (unghiProvenienta_local < 70) {
+    motoare_rotireStanga();
+  } else if (unghiProvenienta_local > 110) {
+    motoare_rotireDreapta();
+  }
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
-
+    motoare_rotireDreapta();
+    delay(500);
+    motoare_rotireStanga();
+    delay(1000);
+    motoare_rotireDreapta();
+    delay(500);
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
@@ -222,9 +242,9 @@ void taskCitireUART(void *parameter){
         String continut = buffer.substring(start, end);
 
         if (continut == "NO_OBJ") {
-          portENTER_CRITICAL(&mux);
+          portENTER_CRITICAL(&muxUART);
           obiect_detectat = 0;
-          portEXIT_CRITICAL(&mux);
+          portEXIT_CRITICAL(&muxUART);
         } else {
           int index1 = continut.indexOf(",");
           int index2 = continut.indexOf(",", index1 + 1);
@@ -234,13 +254,13 @@ void taskCitireUART(void *parameter){
           w = continut.substring(index2 + 1, index3).toInt();
           h = continut.substring(index3 + 1).toInt();
 
-          portENTER_CRITICAL(&mux);
+          portENTER_CRITICAL(&muxUART);
           obiect_detectat = 1;
           obiect_x = x;
           obiect_y = y;
           obiect_w = w;
           obiect_h = h;
-          portEXIT_CRITICAL(&mux);
+          portEXIT_CRITICAL(&muxUART);
         }
 
         buffer = "";
@@ -281,6 +301,12 @@ void loop() {
           // - asteptare prezentaObiect_zonaA = true
           // CAUTARE_ZONA_A
 
+  int unghiProvenienta_local = 0;
+  // protectie la citire
+  portENTER_CRITICAL(&muxRSSI);
+  unghiProvenienta_local = unghiProvenienta;
+  portEXIT_CRITICAL(&muxRSSI);
+  
   switch (stareComport_Robot) {
     // -----------------------------------------------------------------------------
     case STARE_VERIFICARE_PREZENTA_OBIECT:
@@ -309,7 +335,7 @@ void loop() {
             vTaskSuspend(handleTaskDeplasare_CautareStationara);
           }
           // verificare proxomitate fata de Statia_A
-          if (valoareRSSI_unghiMAX < PROX_RSSI_MAX ){   // verificare proximitate 
+          if (unghiProvenienta_local < PROX_RSSI_MAX ){   // verificare proximitate 
             vTaskResume(handleTaskDeplasare_CautareStationara);
             vTaskSuspend(handleTaskDeplasare_Urmarire);
             vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
@@ -333,7 +359,7 @@ void loop() {
     case STARE_ZONA_B: 
       conectareStatie = 2; // conectare STATIE_B
       if(WiFi.SSID() == ssid_statie[conectareStatie]){
-        if (valoareRSSI_unghiMAX < PROX_RSSI_MAX){         // verificare proximitate
+        if (unghiProvenienta_local < PROX_RSSI_MAX){         // verificare proximitate
           brat_eliberare();             // eliberare obiect
           motoare_executieRetragere();  // executare retragere din zona de depozitare
           stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
@@ -356,7 +382,7 @@ void loop() {
     case STARE_ZONA_C: 
       conectareStatie = 3; // conectare STATIE_C
       if(WiFi.SSID() == ssid_statie[conectareStatie]){  // veridicare ca robotul sa fie conectat la statia corecta
-        if (valoareRSSI_unghiMAX < PROX_RSSI_MAX){   // verificare proximitate
+        if (unghiProvenienta_local < PROX_RSSI_MAX){   // verificare proximitate
           // oprire 
           // conectare la STATIA_A
           vTaskSuspend(handleTaskDeplasare_Urmarire);
