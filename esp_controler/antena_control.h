@@ -14,17 +14,22 @@
 #define LIM_SUP 160
 
 // variabile externe - definite în .ino
+extern const char* ssid_statie[];
 extern volatile int interval[2];
 extern Servo servoAntena;
+extern WiFiUDP udpReceiver;
+extern const unsigned int localPort;
 
 void connect_statie(const char* ssid, const char* password) {
     WiFi.disconnect();
+    udpReceiver.stop();
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        Serial.print(".");
+        Serial.println(".");
     }
+    if (WiFi.SSID() == ssid_statie[1]) udpReceiver.begin(localPort);
     Serial.println("");
     Serial.print("WiFi connected ");
     Serial.println(ssid);

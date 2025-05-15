@@ -17,7 +17,7 @@
 #define DRIVER_B_IN4 26
 
 // pin pebtru PWM 
-#define pinPWM 21 
+#define pinPWM 16 
 
 void motoare_deplasareFata() {
   digitalWrite(DRIVER_A_IN1, HIGH);
@@ -97,10 +97,12 @@ void motoare_stop() {
 }
 
 void motoare_executieRetragere(){
+  digitalWrite(pinPWM, HIGH);
   motoare_deplasareSpate();
   delay(500);
   motoare_rotireDreapta();
   delay(1000);
+  digitalWrite(pinPWM, LOW);
 }
 
 #endif
