@@ -68,6 +68,7 @@ volatile int obiect_w = 0;
 volatile int obiect_h = 0;
 portMUX_TYPE muxUART = portMUX_INITIALIZER_UNLOCKED;    // mutex pentru blocarea accesului la o structura de cod - folosit pentru scriere/citire variabile globale
 portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;
+portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;
 
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; // instanta a structurii de date enum StareComportament
 
@@ -170,9 +171,19 @@ void setup() {
 // Task 1: Verificare conexiune si orientarea antenei spre sursa de semnal wifi
 void taskControl_servoAntena(void *parameter) {
   while (true) {
-    if (WiFi.status() != WL_CONNECTED || WiFi.SSID() != ssid_statie[conectareStatie]) {                                              // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
+
+    portENTER_CRITICAL(&muxVarG);
+    int varLocal = conectareStatie;
+    portEXIT_CRITICAL(&muxVarG);
+
+    if(varLocal == 0) {
+      vTaskDelay(50);
+      continue;
+    }
+    
+    if (WiFi.status() != WL_CONNECTED || WiFi.SSID() != ssid_statie[varLocal]) {                                              // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
       servoAntena.write(90);                                                          // pozitionare antena in pozitie default
-      connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]); // conectare la statia curenta
+      connect_statie(ssid_statie[varLocal], password_statie[varLocal]); // conectare la statia curenta
     } else {
       // posibila necesitatea unei verificari suplimentare statiei actual conectate
       if(WiFi.SSID() == ssid_statie[1]){ // verificare conectiune statia A
@@ -198,7 +209,8 @@ void taskControl_servoAntena(void *parameter) {
       portENTER_CRITICAL(&muxRSSI);
       unghiProvenienta = val_temp;
       portEXIT_CRITICAL(&muxRSSI);
-      //Serial.println(det_unghi_orientare()); // FOLOSIT PENTRU TEST
+      Serial.print("TEST - task cont antena - unghi: ");
+      Serial.println(val_temp); // FOLOSIT PENTRU TEST
     }
     vTaskDelay(0); // pentru a permite task ului sa cedeze prioritatea altui task
   }
@@ -206,6 +218,7 @@ void taskControl_servoAntena(void *parameter) {
 
 // Task 2: Control motoarelor pentru a duce unghiul de orientare spre zona tampon de mers inainte
 void taskControl_Deplasare_Urmarire(void *parameter) {
+  digitalWrite(pinPWM, HIGH);
   // control dupa unghiul de comanda al servomotorului anatenei
   int unghiProvenienta_local = 0;
   while (true) {
@@ -225,6 +238,7 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
   }
 }
 void taskControl_Deplasare_CautareStationare(void *parameter) {
+  digitalWrite(pinPWM, HIGH);
   // comenzi repetate de stanga - dreapta
   while (true) {
     motoare_rotireDreapta();
@@ -237,6 +251,7 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
   }
 }
 void taskControl_Deplasare_PozitionareObiect(void *parameter) {
+  digitalWrite(pinPWM, HIGH);
   // - determinarea pozitiei de prindere
   // - activare brat_prindere()
   // - activare motoare_executieRetragere()
@@ -333,33 +348,36 @@ void loop() {
   // Serial.println(prezentaObiect_zonaA);
 
   int unghiProvenienta_local = 0;
+
+  portENTER_CRITICAL(&muxVarG);
+  int varStareLocal = conectareStatie;
+  portEXIT_CRITICAL(&muxVarG);
+
   // protectie la citire
   portENTER_CRITICAL(&muxRSSI);
   unghiProvenienta_local = unghiProvenienta;
   portEXIT_CRITICAL(&muxRSSI);
-
-  digitalWrite(pinPWM, LOW);
   
   switch (stareComport_Robot) {
     Serial.println("TEST - intrare switch");
     // -----------------------------------------------------------------------------
     case STARE_VERIFICARE_PREZENTA_OBIECT:
       vTaskSuspend(handleTaskDeplasare_Urmarire);
-      conectareStatie = 1; // conectare STATIE_A 
-      if(WiFi.status() != WL_CONNECTED || WiFi.SSID() == ssid_statie[conectareStatie]){
+      varStareLocal = 1; // conectare STATIE_A 
+      if(WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[varStareLocal]){
         if(prezentaObiect_zonaA)
           stareComport_Robot = STARE_ZONA_A;
         else
           stareComport_Robot = STARE_ZONA_C;
       }else{
         // conectare la statia A
-        connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]);
+        //connect_statie(ssid_statie[varStareLocal], password_statie[varStareLocal]);
       }
       break;
     // -----------------------------------------------------------------------------
     case STARE_ZONA_A:
-        conectareStatie = 1; // conectare STATIE_A
-        if(WiFi.status() != WL_CONNECTED || WiFi.SSID() == ssid_statie[conectareStatie]){ // validare ca robotul este conectat la statia corecta
+        varStareLocal = 1; // conectare STATIE_A
+        if(WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[varStareLocal]){ // validare ca robotul este conectat la statia corecta
           // VERIFICARE PROXIMITATE FATA DE STATIA_A SAU DETECTIE OBIECT
           // verificare detectie obiect
           if (obiect_detectat == 1){
@@ -371,80 +389,80 @@ void loop() {
           }
           // verificare proxomitate fata de Statia_A
           if (unghiProvenienta_local < PROX_RSSI_MAX ){   // verificare proximitate 
-
+            
             vTaskResume(handleTaskDeplasare_CautareStationara);
             vTaskSuspend(handleTaskDeplasare_Urmarire);
             vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
           }else{
             // controlul motoarelor va fi executat de taskControl_Deplasare_Urmarire
             // mentinere taskControl_DeplasareUrmarire
-
+            digitalWrite(pinPWM, LOW);
             vTaskResume(handleTaskDeplasare_Urmarire);
             vTaskSuspend(handleTaskDeplasare_CautareStationara);
             vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
           }
         }else{
           // blocare task de deplasare si asigurarea conectarii la statia corespunzatoare
-
+          
           vTaskSuspend(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-          connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]);
+          //connect_statie(ssid_statie[varStareLocal], password_statie[varStareLocal]);
         }     
 
       break;
     // -----------------------------------------------------------------------------
     case STARE_ZONA_B: 
-      conectareStatie = 2; // conectare STATIE_B
-      if(WiFi.status() != WL_CONNECTED || WiFi.SSID() == ssid_statie[conectareStatie]){
+      varStareLocal = 2; // conectare STATIE_B
+      if(WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[varStareLocal]){
         if (unghiProvenienta_local < PROX_RSSI_MAX){         // verificare proximitate
           brat_eliberare();             // eliberare obiect
           motoare_executieRetragere();  // executare retragere din zona de depozitare
           stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
         }else{
           // activare task de urmarire a statiei
-
+          
           vTaskResume(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
         }
       }else{
           // blocarea deplasarii daca robotul nu este conectat la statia corespunzatoare
-
+          
           vTaskSuspend(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-          connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]);
+          //connect_statie(ssid_statie[varStareLocal], password_statie[varStareLocal]);
         }
 
       break;
     // -----------------------------------------------------------------------------
     case STARE_ZONA_C: 
-      conectareStatie = 3; // conectare STATIE_C
-      if(WiFi.status() != WL_CONNECTED || WiFi.SSID() == ssid_statie[conectareStatie]){ // veridicare ca robotul sa fie conectat la statia corecta
+      varStareLocal = 3; // conectare STATIE_C
+      if(WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[varStareLocal]){ // veridicare ca robotul sa fie conectat la statia corecta
         if (unghiProvenienta_local < PROX_RSSI_MAX){   // verificare proximitate
           // oprire 
           // conectare la STATIA_A
-
+          digitalWrite(pinPWM, LOW);
           vTaskSuspend(handleTaskDeplasare_Urmarire);
-          conectareStatie = 1;    // conectare STATIE_A
-          connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]);
+          varStareLocal = 1;    // conectare STATIE_A
+          //connect_statie(ssid_statie[varStareLocal], password_statie[varStareLocal]);
           if(prezentaObiect_zonaA)
             stareComport_Robot = STARE_ZONA_A;
         }else{  
           // executie deplasare prin urmarirea statie de interes
-
+          
           vTaskResume(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
         }
       }else{
         // conectare la statia corecta
-     
+        
         vTaskSuspend(handleTaskDeplasare_Urmarire);
         vTaskSuspend(handleTaskDeplasare_CautareStationara);
         vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]);
+        //connect_statie(ssid_statie[varStareLocal], password_statie[varStareLocal]);
       }
 
       break;
@@ -452,7 +470,12 @@ void loop() {
     case STARE_REPAUS:
       // inca nu am nevoie
       break;
-  }    
+  }  
+
+  portENTER_CRITICAL(&muxVarG);
+  conectareStatie = varStareLocal;
+  portEXIT_CRITICAL(&muxVarG); 
+   
 }
 
 // void loop() {

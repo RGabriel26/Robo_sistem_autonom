@@ -3,6 +3,7 @@
 
 #include <WiFi.h>
 #include <ESP32Servo.h>
+#include "motoare.h" // functii destinate deplasarii 
 
 // definire pini
 #define pinServoAntena 4 
@@ -13,6 +14,9 @@
 #define LIM_INF 20
 #define LIM_SUP 160
 
+
+
+
 // variabile externe - definite în .ino
 extern const char* ssid_statie[];
 extern volatile int interval[2];
@@ -22,13 +26,14 @@ extern const unsigned int localPort;
 extern volatile int conectareStatie;
 
 void connect_statie(const char* ssid, const char* password) {
+    digitalWrite(pinPWM, LOW);
     WiFi.disconnect();
     udpReceiver.stop();
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
-        Serial.println(".");
+        Serial.print(".");
     }
     if (WiFi.SSID() == ssid_statie[1]) udpReceiver.begin(localPort);
     Serial.println("");
