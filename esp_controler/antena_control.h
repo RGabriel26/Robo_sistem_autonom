@@ -19,6 +19,7 @@ extern volatile int interval[2];
 extern Servo servoAntena;
 extern WiFiUDP udpReceiver;
 extern const unsigned int localPort;
+extern volatile int conectareStatie;
 
 void connect_statie(const char* ssid, const char* password) {
     WiFi.disconnect();

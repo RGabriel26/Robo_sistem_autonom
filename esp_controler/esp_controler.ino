@@ -170,7 +170,7 @@ void setup() {
 // Task 1: Verificare conexiune si orientarea antenei spre sursa de semnal wifi
 void taskControl_servoAntena(void *parameter) {
   while (true) {
-    if (WiFi.status() != WL_CONNECTED) {                                              // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
+    if (WiFi.status() != WL_CONNECTED || WiFi.SSID() != ssid_statie[conectareStatie]) {                                              // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
       servoAntena.write(90);                                                          // pozitionare antena in pozitie default
       connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]); // conectare la statia curenta
     } else {
