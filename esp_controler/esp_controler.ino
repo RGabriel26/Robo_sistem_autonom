@@ -322,27 +322,28 @@ void loop() {
           // - asteptare prezentaObiect_zonaA = true
           // CAUTARE_ZONA_A
   
-  Serial.println("TEST:");
-  Serial.print("TEST - pin de pwm: ");
-  Serial.println(digitalRead(pinPWM));
-  Serial.print("TEST - statie conectata: ");
-  Serial.println(WiFi.SSID());
-  Serial.print("TEST - stare: ");
-  Serial.println(stareComport_Robot);
-  Serial.print("TEST - prezenta obiect: ");
-  Serial.println(prezentaObiect_zonaA);
+  // Serial.println("TEST:");
+  // Serial.print("TEST - pin de pwm: ");
+  // Serial.println(digitalRead(pinPWM));
+  // Serial.print("TEST - statie conectata: ");
+  // Serial.println(WiFi.SSID());
+  // Serial.print("TEST - stare: ");
+  // Serial.println(stareComport_Robot);
+  // Serial.print("TEST - prezenta obiect: ");
+  // Serial.println(prezentaObiect_zonaA);
 
   int unghiProvenienta_local = 0;
   // protectie la citire
   portENTER_CRITICAL(&muxRSSI);
   unghiProvenienta_local = unghiProvenienta;
   portEXIT_CRITICAL(&muxRSSI);
+
+  digitalWrite(pinPWM, LOW);
   
   switch (stareComport_Robot) {
     Serial.println("TEST - intrare switch");
     // -----------------------------------------------------------------------------
     case STARE_VERIFICARE_PREZENTA_OBIECT:
-      digitalWrite(pinPWM, LOW);
       vTaskSuspend(handleTaskDeplasare_Urmarire);
       conectareStatie = 1; // conectare STATIE_A 
       if(WiFi.status() != WL_CONNECTED || WiFi.SSID() == ssid_statie[conectareStatie]){
@@ -363,28 +364,28 @@ void loop() {
           // verificare detectie obiect
           if (obiect_detectat == 1){
             // trecerea pe control al detectiei
-            digitalWrite(pinPWM, HIGH);
+            
             vTaskResume(handleTaskDeplasare_PozitionareObiect);
             vTaskSuspend(handleTaskDeplasare_Urmarire);
             vTaskSuspend(handleTaskDeplasare_CautareStationara);
           }
           // verificare proxomitate fata de Statia_A
           if (unghiProvenienta_local < PROX_RSSI_MAX ){   // verificare proximitate 
-            digitalWrite(pinPWM, HIGH);
+
             vTaskResume(handleTaskDeplasare_CautareStationara);
             vTaskSuspend(handleTaskDeplasare_Urmarire);
             vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
           }else{
             // controlul motoarelor va fi executat de taskControl_Deplasare_Urmarire
             // mentinere taskControl_DeplasareUrmarire
-            digitalWrite(pinPWM, HIGH);
+
             vTaskResume(handleTaskDeplasare_Urmarire);
             vTaskSuspend(handleTaskDeplasare_CautareStationara);
             vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
           }
         }else{
           // blocare task de deplasare si asigurarea conectarii la statia corespunzatoare
-          digitalWrite(pinPWM, LOW);
+
           vTaskSuspend(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
@@ -402,14 +403,14 @@ void loop() {
           stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
         }else{
           // activare task de urmarire a statiei
-          digitalWrite(pinPWM, HIGH);
+
           vTaskResume(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
         }
       }else{
           // blocarea deplasarii daca robotul nu este conectat la statia corespunzatoare
-          digitalWrite(pinPWM, LOW);
+
           vTaskSuspend(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
@@ -424,7 +425,7 @@ void loop() {
         if (unghiProvenienta_local < PROX_RSSI_MAX){   // verificare proximitate
           // oprire 
           // conectare la STATIA_A
-          digitalWrite(pinPWM, LOW);
+
           vTaskSuspend(handleTaskDeplasare_Urmarire);
           conectareStatie = 1;    // conectare STATIE_A
           connect_statie(ssid_statie[conectareStatie], password_statie[conectareStatie]);
@@ -432,14 +433,14 @@ void loop() {
             stareComport_Robot = STARE_ZONA_A;
         }else{  
           // executie deplasare prin urmarirea statie de interes
-          digitalWrite(pinPWM, HIGH);
+
           vTaskResume(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
         }
       }else{
         // conectare la statia corecta
-        digitalWrite(pinPWM, LOW);
+     
         vTaskSuspend(handleTaskDeplasare_Urmarire);
         vTaskSuspend(handleTaskDeplasare_CautareStationara);
         vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
