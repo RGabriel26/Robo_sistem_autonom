@@ -14,9 +14,6 @@
 #define LIM_INF 20
 #define LIM_SUP 160
 
-
-
-
 // variabile externe - definite în .ino
 extern const char* ssid_statie[];
 extern volatile int interval[2];
@@ -60,7 +57,7 @@ void trunchiere_interval(int unghi_max_rssi, int val_restrangere) {
 
 // la folosirea acestei functii este nevoie de integrarea intr-un block de interogare astfel
 // pentru a se efita cazurile in care se pierde conectiunea cu statia in timpul rularii
-int det_unghi_orientare() {
+int det_unghi_orientare(int &rssi_max_out) {
         int unghi_max_rssi = 0;
         int max_rssi = -200;
 
@@ -98,6 +95,7 @@ int det_unghi_orientare() {
         }
 
         trunchiere_interval(unghi_max_rssi, 20);
+        rssi_max_out = max_rssi; // valoarea transmisa prin referita
 
         return unghi_max_rssi;
 }
