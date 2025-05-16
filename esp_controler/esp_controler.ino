@@ -79,7 +79,11 @@ StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; // inst
 TaskHandle_t handleTaskDeplasare_Urmarire = NULL;
 TaskHandle_t handleTaskDeplasare_CautareStationara = NULL;
 TaskHandle_t handleTaskDeplasare_PozitionareObiect = NULL; 
-TaskHandle_t handletaskComportamentRobot = NULL;
+TaskHandle_t handleTaskControl_servoAntena = NULL;
+TaskHandle_t handleTaskComportamentRobot = NULL;
+
+void initTaskuri();
+void asteptareReconectare(int conectareStare_local);
 
 void setup() {
   // setare UART 0 in cazul debugging ului
@@ -117,6 +121,13 @@ void setup() {
   // initializare tasks
   initTaskuri();
 
+  // oprire task uri inutile
+  delay(1000);
+  vTaskSuspend(handleTaskDeplasare_Urmarire);
+  vTaskSuspend(handleTaskDeplasare_CautareStationara);
+  vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+  //vTaskSuspend(handleTaskControl_servoAntena);
+
   // stare finala
   digitalWrite(pinPWM, LOW); // setat in HIGH pentru tensiune continua de 3.3V, echivalent PWM 100 %
 
@@ -141,7 +152,7 @@ void taskControl_servoAntena(void *parameter) {
       servoAntena.write(90);                                                     // pozitionare antena in pozitie default
       connect_statie(ssid_statie[varLocal], password_statie[varLocal]);          // conectare la statia curenta
       Serial.println("taskControl_servoAntena - conectat la retea - activare handletaskComportamentRobot");
-      vTaskResume(handletaskComportamentRobot);
+      vTaskResume(handleTaskComportamentRobot);
     } else {
       // posibila necesitatea unei verificari suplimentare statiei actual conectate
       if(WiFi.SSID() == ssid_statie[1]){ // verificare conectiune statia A
@@ -157,8 +168,8 @@ void taskControl_servoAntena(void *parameter) {
             prezentaObiect_zonaA = valoare;
             portEXIT_CRITICAL(&muxUART);
 
-            // Serial.print("Mesaj UDP primit (zona A): ");
-            // Serial.println(prezentaObiect_zonaA);
+            Serial.print("DEGUB - taskControl_servoAntena - Mesaj UDP primit (zona A): ");
+            Serial.println(prezentaObiect_zonaA);
           }
         }
       }
@@ -167,11 +178,11 @@ void taskControl_servoAntena(void *parameter) {
       portENTER_CRITICAL(&muxUNGHI);
       unghiProvenienta = val_temp;
       portEXIT_CRITICAL(&muxUNGHI);
-      Serial.print("TEST - task cont antena - unghi: ");
+      Serial.print("DEGUB - taskControl_servoAntena - unghi: ");
       Serial.println(val_temp); // FOLOSIT PENTRU TEST
     }
-    taskYIELD();
-    // vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
+    //taskYIELD();
+    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
 
@@ -179,11 +190,14 @@ void taskControl_servoAntena(void *parameter) {
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
   while (true) {
-  digitalWrite(pinPWM, HIGH);
-  int unghiProvenienta_local = 0;
+    digitalWrite(pinPWM, HIGH);
+    // Serial.println("DEGUB - taskControl_Deplasare_Urmarire - intrat in executie");
+    // Serial.print("DEGUB - taskControl_Deplasare_Urmarire - pin pwm: ");
+    // Serial.println(digitalRead(pinPWM));
+    
     // protectie la citire
     portENTER_CRITICAL(&muxUNGHI);
-    unghiProvenienta_local = unghiProvenienta;
+    int unghiProvenienta_local = unghiProvenienta;
     portEXIT_CRITICAL(&muxUNGHI);
 
     if (unghiProvenienta_local >= 70 && unghiProvenienta_local <= 110) {
@@ -193,15 +207,17 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
     } else if (unghiProvenienta_local > 110) {
       motoare_rotireDreapta();
     }
-    taskYIELD();
-    // vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
+    //taskYIELD();
+    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
     digitalWrite(pinPWM, HIGH);
-
+    // Serial.println("DEGUB - taskControl_Deplasare_CautareStationare - intrat in executie");
+    // Serial.print("DEGUB - taskControl_Deplasare_CautareStationare - pin pwm: ");
+    // Serial.println(digitalRead(pinPWM));
     motoare_rotireDreapta();
     delay(500);
     motoare_rotireStanga();
@@ -209,8 +225,8 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
     motoare_rotireDreapta();
     delay(500);
     
-    taskYIELD();
-    //vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
+    //taskYIELD();
+    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
 void taskControl_Deplasare_PozitionareObiect(void *parameter) {
@@ -220,9 +236,12 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - schimbare stare - STARE_STATIA_B
   while (true) {
     digitalWrite(pinPWM, HIGH);
+    // Serial.println("DEGUB - taskControl_Deplasare_PozitionareObiect - intrat in executie");
+    // Serial.print("DEGUB - taskControl_Deplasare_PozitionareObiect - pin pwm: ");
+    // Serial.println(digitalRead(pinPWM));
 
-    taskYIELD();
-    //vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
+    //taskYIELD();
+    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
 
@@ -265,13 +284,17 @@ void taskCitireUART(void *parameter){
         buffer = "";
       }
     }
-    taskYIELD();
-    // vTaskDelay(1);
+    //taskYIELD();
+    vTaskDelay(1);
   }
 }
 
 void taskComportamentRobot(void *parameter) {
   while (1) {
+
+  //   if (eTaskGetState(handleTaskControl_servoAntena) == eSuspended)
+  //     vTaskResume(handleTaskControl_servoAntena);
+
     static unsigned long ultimaAfisare = 0;
     unsigned long timpCurent = millis();
     if (timpCurent - ultimaAfisare >= 1000) {
@@ -304,10 +327,10 @@ void taskComportamentRobot(void *parameter) {
       case STARE_VERIFICARE_PREZENTA_OBIECT:
         Serial.println("TEST - switch 1 - STARE VERIFICARE");
         vTaskSuspend(handleTaskDeplasare_Urmarire);
-        pinMode(pinPWM, LOW);
+        //digitalWrite(pinPWM, LOW);
         conectareStare_local = 1;
         if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[conectareStare_local]) {
-          delay(1000);
+          delay(3000);
           if (prezentaObiect_zonaA) {
             Serial.println("DEBUG - switch - prezenta obiect - salt stare A");
             stareComport_Robot = STARE_ZONA_A;
@@ -316,6 +339,7 @@ void taskComportamentRobot(void *parameter) {
             stareComport_Robot = STARE_ZONA_C;
           }
         } else {
+          servoAntena.write(90);
           asteptareReconectare(conectareStare_local);
         }
         break;
@@ -410,8 +434,8 @@ void taskComportamentRobot(void *parameter) {
         // inca nu am nevoie
         break;
     }
-    taskYIELD();
-    // vTaskDelay(50 / portTICK_PERIOD_MS); // delay scurt pentru cooperativitate
+    //taskYIELD();
+    vTaskDelay(500); // delay scurt pentru cooperativitate
   }
 }
 
@@ -422,7 +446,7 @@ void initTaskuri(){
     4096,             // stack size
     NULL,             // parametru
     1,                // prioritate
-    NULL,             // handle (optional)
+    &handleTaskControl_servoAntena,             // handle (optional)
     0                 // core 0
   );
 
@@ -472,20 +496,20 @@ void initTaskuri(){
     4096,
     NULL,
     1,
-    &handletaskComportamentRobot,
+    &handleTaskComportamentRobot,
     1               // core 1
   );
 }
 
 void asteptareReconectare(int conectareStare_local){
   Serial.println("DEBUG - switch - retea incorecta - dezactivare handletaskComportamentRobot");
-  pinMode(pinPWM, LOW);
+  digitalWrite(pinPWM, LOW);
   
   portENTER_CRITICAL(&muxVarG);
   conectareStatie = conectareStare_local;
   portEXIT_CRITICAL(&muxVarG); 
 
-  vTaskSuspend(handletaskComportamentRobot);
+  vTaskSuspend(handleTaskComportamentRobot);
   taskYIELD();
 }
 
