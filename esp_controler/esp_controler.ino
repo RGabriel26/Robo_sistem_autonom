@@ -222,7 +222,7 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
         motoare_rotireDreapta();
       }
     }else
-      digitalWrite(pinPWM, LOW)
+      digitalWrite(pinPWM, LOW);
     //taskYIELD();
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
@@ -243,7 +243,7 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
     delay(500);
     
     }else
-      digitalWrite(pinPWM, LOW)
+      digitalWrite(pinPWM, LOW);
     //taskYIELD();
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
@@ -262,7 +262,7 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
 
     //taskYIELD();
     }else
-      digitalWrite(pinPWM, LOW)
+      digitalWrite(pinPWM, LOW);
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
@@ -325,6 +325,12 @@ void taskComportamentRobot(void *parameter) {
   int valoareRSSI_local = valoareRSSI;
   portEXIT_CRITICAL(&muxRSSI);
   
+  portENTER_CRITICAL(&muxUART);
+  int prezentaObiect_zonaA_local = prezentaObiect_zonaA;
+  portEXIT_CRITICAL(&muxUART);
+
+  // TODO: fa protectie la obiect_detectat
+  
   // static unsigned long ultimaAfisare = 0;
   // unsigned long timpCurent = millis();
   // if (timpCurent - ultimaAfisare >= 500) {
@@ -368,7 +374,7 @@ void taskComportamentRobot(void *parameter) {
       vTaskSuspend(handleTaskDeplasare_Urmarire);
       if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[conectareStare_local]) {
         vTaskDelay(3000);
-        if (prezentaObiect_zonaA) {
+        if (prezentaObiect_zonaA_local) {
           Serial.println("DEBUG - switch - prezenta obiect - salt stare A");
           stareComport_Robot = STARE_ZONA_A;
         } else {
@@ -465,13 +471,18 @@ void taskComportamentRobot(void *parameter) {
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
           vTaskSuspend(handleTaskComportamentRobot);
           // conectare realizata cand se reactiveaza task ul comportamental
-          while(!prezentaObiect_zonaA){
-            Serial.println("DEBUG - switch 4 - IN ZONA PROXIMITATE - EXECUTARE OPRIRE - ASTEPTARE DUPA prezentaObiect_zonaA.....");
-            vTaskSuspend(handleTaskDeplasare_Urmarire);
-            vTaskSuspend(handleTaskDeplasare_CautareStationara);
-            vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+          Serial.println("DEBUG - switch 4 - IN ZONA PROXIMITATE - EXECUTARE OPRIRE - ASTEPTARE DUPA prezentaObiect_zonaA.....");
+          vTaskSuspend(handleTaskDeplasare_Urmarire);
+          vTaskSuspend(handleTaskDeplasare_CautareStationara);
+          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+          int prezentaObiect_zonaA_local = 0;
+          while(!prezentaObiect_zonaA_local){
+            portENTER_CRITICAL(&muxUART);
+            prezentaObiect_zonaA_local = prezentaObiect_zonaA;
+            portEXIT_CRITICAL(&muxUART);
             vTaskDelay(100);
           }
+          
           stareComport_Robot = STARE_ZONA_A;          
         } else {
           Serial.println("DEBUG - switch 4 - OUT ZONA PROXIMITATE - TASK URMARIRE");
@@ -543,7 +554,7 @@ void initTaskuri(){
     4096,
     NULL,
     1,
-    &handleTaskDeplasare_PozitionareObiect,
+    NULL,
     1               // core 1
   );
 
