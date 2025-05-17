@@ -73,6 +73,11 @@ portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;
 unsigned long ultimaAfisare = 0;  // variabila global de timp - afisare mesaje de debug
 
+// variabile de activare pentru taskurile de deplasare
+int task_urmarire = 0;
+int task_pozitionare = 0;
+int task_cautareStationara = 0;
+
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; // instanta a structurii de date enum StareComportament
 
 // handelere pentru controlul activarii taskurilor
@@ -198,23 +203,26 @@ void taskControl_servoAntena(void *parameter) {
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
   while (true) {
-    //digitalWrite(pinPWM, HIGH);
-    // Serial.println("DEGUB - taskControl_Deplasare_Urmarire - intrat in executie");
-    // Serial.print("DEGUB - taskControl_Deplasare_Urmarire - pin pwm: ");
-    // Serial.println(digitalRead(pinPWM));
+    if (task_urmarire){
+      //digitalWrite(pinPWM, HIGH);
+      // Serial.println("DEGUB - taskControl_Deplasare_Urmarire - intrat in executie");
+      // Serial.print("DEGUB - taskControl_Deplasare_Urmarire - pin pwm: ");
+      // Serial.println(digitalRead(pinPWM));
 
-    // protectie la citire
-    portENTER_CRITICAL(&muxUNGHI);
-    int unghiProvenienta_local = unghiOrientare;
-    portEXIT_CRITICAL(&muxUNGHI);
+      // protectie la citire
+      portENTER_CRITICAL(&muxUNGHI);
+      int unghiProvenienta_local = unghiOrientare;
+      portEXIT_CRITICAL(&muxUNGHI);
 
-    if (unghiProvenienta_local >= 70 && unghiProvenienta_local <= 110) {
-      motoare_deplasareFata();
-    } else if (unghiProvenienta_local < 70) {
-      motoare_rotireStanga();
-    } else if (unghiProvenienta_local > 110) {
-      motoare_rotireDreapta();
-    }
+      if (unghiProvenienta_local >= 70 && unghiProvenienta_local <= 110) {
+        motoare_deplasareFata();
+      } else if (unghiProvenienta_local < 70) {
+        motoare_rotireStanga();
+      } else if (unghiProvenienta_local > 110) {
+        motoare_rotireDreapta();
+      }
+    }else
+      digitalWrite(pinPWM, LOW)
     //taskYIELD();
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
@@ -222,6 +230,7 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
+    if (task_cautareStationara){
     //digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_CautareStationare - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_CautareStationare - pin pwm: ");
@@ -233,6 +242,8 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
     motoare_rotireDreapta();
     delay(500);
     
+    }else
+      digitalWrite(pinPWM, LOW)
     //taskYIELD();
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
@@ -243,12 +254,15 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - activare motoare_executieRetragere()
   // - schimbare stare - STARE_STATIA_B
   while (true) {
+    if(task_pozitionare){
     //digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_PozitionareObiect - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_PozitionareObiect - pin pwm: ");
     // Serial.println(digitalRead(pinPWM));
 
     //taskYIELD();
+    }else
+      digitalWrite(pinPWM, LOW)
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
@@ -342,6 +356,11 @@ void taskComportamentRobot(void *parameter) {
   Serial.print("TEST - valoare RSSI: ");
   Serial.println(valoareRSSI_local);
 
+  // activare task uri de deplasare
+  task_cautareStationara = 1; 
+  task_pozitionare = 1; 
+  task_urmarire = 1; 
+
   switch (stareComport_Robot) {
     case STARE_VERIFICARE_PREZENTA_OBIECT:
       Serial.println("TEST - switch 1 - STARE VERIFICARE");
@@ -349,7 +368,7 @@ void taskComportamentRobot(void *parameter) {
       //digitalWrite(pinPWM, LOW);
       conectareStare_local = 1;
       if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[conectareStare_local]) {
-        delay(3000);
+        vTaskDelay(3000);
         if (prezentaObiect_zonaA) {
           Serial.println("DEBUG - switch - prezenta obiect - salt stare A");
           stareComport_Robot = STARE_ZONA_A;
