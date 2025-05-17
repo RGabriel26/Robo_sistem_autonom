@@ -99,9 +99,9 @@ void motoare_stop() {
 void motoare_executieRetragere(){
   digitalWrite(pinPWM, HIGH);
   motoare_deplasareSpate();
-  delay(500);
+  vTaskDelay(500);
   motoare_rotireDreapta();
-  delay(1000);
+  vTaskDelay(1000);
   digitalWrite(pinPWM, LOW);
 }
 

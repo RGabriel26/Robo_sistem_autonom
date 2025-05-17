@@ -12,13 +12,14 @@
 ================================================================================
 
 motoare.h:
-  - FORWARD()           - deplasare inainte
-  - BACK()              - deplasare inapoi
-  - LEFT()              - rotire in stanga
-  - RIGHT()             - rotire in dreapta
-  - VERTICAL_LEFT()     - deplasare laterala stanga (roti magnum)
-  - VERTICAL_RIGHT()    - deplasare laterala dreapta (roti magnum)
-  - STOP()              - oprire completa a motoarelor
+  - motoare_deplasareFata()           - deplasare inainte
+  - motoare_deplasareSpate()          - deplasare inapoi
+  - motoare_rotireStanga()            - rotire in stanga
+  - motoare_rotireDreapta()           - rotire in dreapta
+  - motoare_verticalStanga()          - deplasare laterala stanga (roti magnum)
+  - motoare_verticalDreapta()         - deplasare laterala dreapta (roti magnum)
+  - motoare_stop()                    - oprire completa a motoarelor
+  - motoare_executieRetragere()       - pentru executia manevrei de retragere din statie dupa prindere/eliberare obiect
 
 antena_control.h:
   - connect_statie(const char* ssid, const char* password)          - conectare la o retea Wi-Fi specificata
@@ -33,8 +34,8 @@ brat_control.h:
 */
 
 // date de conectare pentru statii
-const char* ssid_statie[] = {"", "Statia_A", "Statia_B", "Statia_C"}; // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
-const char* password_statie[] = {"", "12345678", "12345678", "12345678"};
+const char* ssid_statie[] = {"", "Statia_A", "Statia_B", "Statia_C"};     // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
+const char* password_statie[] = {"", "12345678", "12345678", "12345678"}; 
 
 // instante servo
 Servo servoAntena; // pentru antena
@@ -43,14 +44,14 @@ Servo servoHead;   // pentru brat - servo de la efector - miscare orizontala
 
 // instanda UDP
 WiFiUDP udpReceiver;
-const unsigned int localPort = 4210; // trebuie sa fie acelasi ca pe ESP8266
-
+const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul UDP cu statia A
+ 
 // parametrii
-#define PROX_RSSI_MAX -45
+#define PROX_RSSI_MAX -45            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
 
 // variabile globale
-// enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
-enum StareComportament{
+
+enum StareComportament{             // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
   STARE_VERIFICARE_PREZENTA_OBIECT,
   STARE_ZONA_A,
   STARE_ZONA_B, 
@@ -60,25 +61,26 @@ enum StareComportament{
 volatile int interval[2] = {LIM_INF , LIM_SUP};     // interval cu unghiurile pe care le va explora antena
 volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
 volatile int prezentaObiect_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
-volatile int unghiOrientare = 0;                  // unghiul de comanda al servo unde s-a depistat valoare maxima RSSI din intervalul de unghiuri in care s-au facut cautarile
-volatile int valoareRSSI = 0;
-volatile int obiect_detectat = 0;
-volatile int obiect_x = 0;
-volatile int obiect_y = 0;
-volatile int obiect_w = 0; 
-volatile int obiect_h = 0;
-portMUX_TYPE muxUART = portMUX_INITIALIZER_UNLOCKED;    // mutex pentru blocarea accesului la o structura de cod - folosit pentru scriere/citire variabile globale
-portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;
-portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;
-portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;
-unsigned long ultimaAfisare = 0;  // variabila global de timp - afisare mesaje de debug
+volatile int unghiOrientare = 0;                    // unghiul de comanda al servo unde s-a depistat valoare maxima RSSI din intervalul de unghiuri in care s-au facut cautarile
+volatile int valoareRSSI = 0;                       // valoarea rssi masurata corespunzatoare unghiului de orientare
+volatile int obiect_detectat = 0;                   // inregistreaza prezenta obiectului din zona A
+volatile int obiect_x = 0;                          // coordonate x al obiectului detectat
+volatile int obiect_y = 0;                          // coordonate y al obiectului detectat
+volatile int obiect_w = 0;                          // coordonate w al obiectului detectat
+volatile int obiect_h = 0;                          // coordonate h al obiectului detectat
+portMUX_TYPE muxUART = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabile prin uart
+portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabila RSSI
+portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabile globale
+portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;   // mutex acces variabila unghi de orientare al antenei
+unsigned long ultimaAfisare = 0;                    // variabila global de timp - afisare mesaje de debug - in conditii de test
 
-// variabile de activare pentru taskurile de deplasare
+// variabile de activare / blocare a logicii taskurilor de deplasare
 int task_urmarire = 0;
 int task_pozitionare = 0;
 int task_cautareStationara = 0;
 
-StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; // instanta a structurii de date enum StareComportament
+// instanta a structurii de date enum StareComportament
+StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; 
 
 // handelere pentru controlul activarii taskurilor
 TaskHandle_t handleTaskDeplasare_Urmarire = NULL;
@@ -171,14 +173,14 @@ void taskControl_servoAntena(void *parameter) {
             portEXIT_CRITICAL(&muxUART);
 
             Serial.print("DEBUG - taskControl_servoAntena - Mesaj UDP primit (zona A): ");
-            Serial.println(prezentaObiect_zonaA);
+            Serial.println(valoare);
           }
         }
       }
       // activare roti daca robotul este conectat la o statie
       digitalWrite(pinPWM, HIGH);
 
-      // determinarea unghiului de orientare spre sursa de semnal
+      // determinarea unghiului de orientare spre sursa de semnal si obtinerea valorii RSSI
       int val_RSSI_temp = 0;
       int val_unghi_temp = det_unghi_orientare(val_RSSI_temp);
 
@@ -236,11 +238,11 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
     // Serial.print("DEGUB - taskControl_Deplasare_CautareStationare - pin pwm: ");
     // Serial.println(digitalRead(pinPWM));
     motoare_rotireDreapta();
-    delay(500);
+    vTaskDelay(500);
     motoare_rotireStanga();
-    delay(1000);
+    vTaskDelay(1000);
     motoare_rotireDreapta();
-    delay(500);
+    vTaskDelay(500);
     
     }else
       digitalWrite(pinPWM, LOW);
@@ -255,7 +257,7 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - schimbare stare - STARE_STATIA_B
   while (true) {
     if(task_pozitionare){
-    //digitalWrite(pinPWM, HIGH);
+    // digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_PozitionareObiect - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_PozitionareObiect - pin pwm: ");
     // Serial.println(digitalRead(pinPWM));
@@ -314,9 +316,6 @@ void taskCitireUART(void *parameter){
 void taskComportamentRobot(void *parameter) {
   while (1) {
 
-  //   if (eTaskGetState(handleTaskControl_servoAntena) == eSuspended)
-  //     vTaskResume(handleTaskControl_servoAntena);
-
   portENTER_CRITICAL(&muxVarG);
   int conectareStare_local = conectareStatie;
   portEXIT_CRITICAL(&muxVarG);
@@ -327,27 +326,8 @@ void taskComportamentRobot(void *parameter) {
   
   portENTER_CRITICAL(&muxUART);
   int prezentaObiect_zonaA_local = prezentaObiect_zonaA;
+  int obiect_detectat_local = obiect_detectat;
   portEXIT_CRITICAL(&muxUART);
-
-  // TODO: fa protectie la obiect_detectat
-  
-  // static unsigned long ultimaAfisare = 0;
-  // unsigned long timpCurent = millis();
-  // if (timpCurent - ultimaAfisare >= 500) {
-  //   ultimaAfisare = timpCurent;
-  //   Serial.println("");
-  //   Serial.println("TEST:");
-  //   Serial.print("TEST - pin de pwm: ");
-  //   Serial.println(digitalRead(pinPWM));
-  //   Serial.print("TEST - statie conectata: ");
-  //   Serial.println(WiFi.SSID());
-  //   Serial.print("TEST - stare: ");
-  //   Serial.println(stareComport_Robot);
-  //   Serial.print("TEST - prezenta obiect: ");
-  //   Serial.println(prezentaObiect_zonaA);
-  //   Serial.print("TEST - valoare RSSI: ");
-  //   Serial.println(valoareRSSI_local);
-  // }
 
   Serial.println("");
   Serial.println("TEST:");
@@ -391,7 +371,7 @@ void taskComportamentRobot(void *parameter) {
       conectareStare_local = 1;
       vTaskSuspend(handleTaskDeplasare_Urmarire);
       if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[conectareStare_local]) {
-        if (obiect_detectat == 1) {
+        if (obiect_detectat_local == 1) {
           Serial.println("DEBUG - switch 2 - OBIECT DETECTAT VIDEO - TASK POZITIONARE OBC");
           vTaskResume(handleTaskDeplasare_PozitionareObiect);
           vTaskSuspend(handleTaskDeplasare_Urmarire);
@@ -447,34 +427,20 @@ void taskComportamentRobot(void *parameter) {
       if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[conectareStare_local]) {
         if (valoareRSSI_local > PROX_RSSI_MAX) {
           Serial.println("DEBUG - switch 4 - IN ZONA PROXIMITATE - EXECUTARE OPRIRE - VERIFICARE PREZENTA OBIECT");
-          // vTaskSuspend(handleTaskDeplasare_Urmarire);
-          // conectareStare_local = 1;
-          // // schimbare retea conectata 
-          // portENTER_CRITICAL(&muxVarG);
-          // conectareStatie = conectareStare_local;
-          // portEXIT_CRITICAL(&muxVarG); 
-          // vTaskSuspend(handleTaskComportamentRobot);
-          // delay(1000); // asteptare dupa verificare prezentei obiecutului din zona A
-          // if (prezentaObiect_zonaA)
-          //   stareComport_Robot = STARE_ZONA_A;
-          // else 
-          //   stareComport_Robot = STARE_ZONA_C;
-          
           // e executa oprirea si se asteapta conectarea la o statia A
           digitalWrite(pinPWM, LOW);
           conectareStare_local = 1;
           portENTER_CRITICAL(&muxVarG);
           conectareStatie = conectareStare_local;
           portEXIT_CRITICAL(&muxVarG); 
+
           vTaskSuspend(handleTaskDeplasare_Urmarire);
           vTaskSuspend(handleTaskDeplasare_CautareStationara);
           vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
           vTaskSuspend(handleTaskComportamentRobot);
           // conectare realizata cand se reactiveaza task ul comportamental
           Serial.println("DEBUG - switch 4 - IN ZONA PROXIMITATE - EXECUTARE OPRIRE - ASTEPTARE DUPA prezentaObiect_zonaA.....");
-          vTaskSuspend(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_CautareStationara);
-          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+
           int prezentaObiect_zonaA_local = 0;
           while(!prezentaObiect_zonaA_local){
             portENTER_CRITICAL(&muxUART);
