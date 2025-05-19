@@ -24,7 +24,7 @@
 // https://github.com/espressif/arduino-esp32/releases/tag/2.0.4
 
 /* Includes ---------------------------------------------------------------- */
-#include <ROBO_detect_inferencing.h>
+#include <ROBO_licenta_inferencing.h>
 #include "edge-impulse-sdk/dsp/image/image.hpp"
 
 #include "esp_camera.h"

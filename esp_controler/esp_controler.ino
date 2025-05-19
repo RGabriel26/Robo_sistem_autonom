@@ -50,7 +50,6 @@ const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul 
 #define PROX_RSSI_MAX -45            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
 
 // variabile globale
-
 enum StareComportament{             // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
   STARE_VERIFICARE_PREZENTA_OBIECT,
   STARE_ZONA_A,
