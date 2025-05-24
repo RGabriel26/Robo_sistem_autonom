@@ -1,3 +1,7 @@
+#include <ROBO_detect_inferencing.h>
+
+#include <ROBO_detect_inferencing.h>
+
 #include "motoare.h" // functii destinate deplasarii 
 #include "antena_control.h" // funtii destinate orientarii antenei
 #include "brat_control.h" // functii destinate controlului bratului apucator
