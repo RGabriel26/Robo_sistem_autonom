@@ -59,7 +59,7 @@ enum StareComportament{             // enum folosit pentru determinarea executie
 };
 volatile int interval[2] = {LIM_INF , LIM_SUP};     // interval cu unghiurile pe care le va explora antena
 volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
-volatile int prezentaObiect_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
+volatile int obiect_prezent_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
 volatile int unghiOrientare = 0;                    // unghiul de comanda al servo unde s-a depistat valoare maxima RSSI din intervalul de unghiuri in care s-au facut cautarile
 volatile int valoareRSSI = 0;                       // valoarea rssi masurata corespunzatoare unghiului de orientare
 volatile int obiect_detectat = 0;                   // inregistreaza prezenta obiectului din zona A
@@ -129,7 +129,7 @@ void taskControl_servoAntena(void *parameter) {
     if (WiFi.status() != WL_CONNECTED || WiFi.SSID() != ssid_statie[varLocal]) { // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
       servoAntena.write(90);                                                     // pozitionare antena in pozitie default
       connect_statie(ssid_statie[varLocal], password_statie[varLocal]);          // conectare la statia curenta
-      Serial.println("taskControl_servoAntena - conectat la retea - activare handletaskComportamentRobot");
+      Serial.println("DEBUG - taskControl_servoAntena - conectat la retea + activare handleTaskComportamentRobot");
       vTaskResume(handleTaskComportamentRobot);
     } else {
       // posibila necesitatea unei verificari suplimentare statiei actual conectate
@@ -143,7 +143,7 @@ void taskControl_servoAntena(void *parameter) {
             int valoare = atoi(incomingPacket); // conversie la int
 
             portENTER_CRITICAL(&muxUART);
-            prezentaObiect_zonaA = valoare;
+            obiect_prezent_zonaA = valoare;
             portEXIT_CRITICAL(&muxUART);
 
             Serial.print("DEBUG - taskControl_servoAntena - Mesaj UDP primit (zona A): ");
@@ -296,7 +296,7 @@ void taskComportamentRobot(void *parameter) {
     portEXIT_CRITICAL(&muxRSSI);
 
     portENTER_CRITICAL(&muxUART);
-    int prezenta_local = prezentaObiect_zonaA;
+    int obiect_prezent_local  = obiect_prezent_zonaA;
     int obiect_detectat_local = obiect_detectat;
     portEXIT_CRITICAL(&muxUART);
 
@@ -305,13 +305,13 @@ void taskComportamentRobot(void *parameter) {
     Serial.print("SSID: "); Serial.println(WiFi.SSID());
     Serial.print("STARE: "); Serial.println(stareComport_Robot);
     Serial.print("RSSI: "); Serial.println(rssi_local);
-    Serial.print("PREZENTA: "); Serial.println(prezenta_local);
+    Serial.print("PREZENTA: "); Serial.println(obiect_prezent_local);
     Serial.print("OBIECT DETECTAT: "); Serial.println(obiect_detectat_local);
 
     // executie comportament pe baza starii
     switch (stareComport_Robot) {
       case STARE_VERIFICARE_PREZENTA_OBIECT:
-        handleStare_Verificare(prezenta_local);
+        handleStare_Verificare(obiect_prezent_local);
         break;
 
       case STARE_ZONA_A:
@@ -323,7 +323,7 @@ void taskComportamentRobot(void *parameter) {
         break;
 
       case STARE_ZONA_C:
-        handleStareZona_C(rssi_local);
+        handleStareZona_C(rssi_local, obiect_prezent_local);
         break;
 
       case STARE_REPAUS:
@@ -334,14 +334,14 @@ void taskComportamentRobot(void *parameter) {
   }
 }
 
-void handleStare_Verificare(int prezenta) {
+void handleStare_Verificare(int obiect_prezent) {
   Serial.println("DEBUG - STARE_VERIFICARE");
 
   conectareStatie = 1;
 
   if (isConnectedToStation(1)) {
     vTaskDelay(3000);
-    if (prezenta) {
+    if (obiect_prezent) {
       Serial.println("DEBUG - Obiect prezent. Trecere la STARE_ZONA_A.");
       stareComport_Robot = STARE_ZONA_A;
     } else {
@@ -397,7 +397,7 @@ void handleStareZona_B(int RSSI) {
   }
 }
 
-void handleStareZona_C(int RSSI) {
+void handleStareZona_C(int RSSI, int obiect_prezent) {
   Serial.println("DEBUG - STARE_ZONA_C");
 
   conectareStatie = 3;
@@ -411,11 +411,11 @@ void handleStareZona_C(int RSSI) {
       activeazaTaskuri_Deplasare(false, false, false);
       asteptareReconectare(1);
       if (isConnectedToStation(1)) {
-        int prezenta = 0;
+        int prezenta = obiect_prezent;
         while (!prezenta) {
           Serial.println("DEBUG - STARE_ZONA_C - Asteptare prezenta obiect in zona A...");
           portENTER_CRITICAL(&muxUART);
-          prezenta = prezentaObiect_zonaA;
+          prezenta = obiect_prezent_zonaA;
           portEXIT_CRITICAL(&muxUART);
           vTaskDelay(1000);
         }
