@@ -333,7 +333,6 @@ void taskComportamentRobot(void *parameter) {
     vTaskDelay(500);
   }
 }
-
 void handleStare_Verificare(int obiect_prezent) {
   Serial.println("DEBUG - STARE_VERIFICARE");
 
@@ -342,17 +341,16 @@ void handleStare_Verificare(int obiect_prezent) {
   if (isConnectedToStation(1)) {
     vTaskDelay(3000);
     if (obiect_prezent) {
-      Serial.println("DEBUG - Obiect prezent. Trecere la STARE_ZONA_A.");
+      Serial.println("DEBUG - STARE_VERIFICARE - Obiect prezent. Trecere la STARE_ZONA_A.");
       stareComport_Robot = STARE_ZONA_A;
     } else {
-      Serial.println("DEBUG - Obiect absent. Trecere la STARE_ZONA_C.");
+      Serial.println("DEBUG - STARE_VERIFICARE - Obiect absent. Trecere la STARE_ZONA_C.");
       stareComport_Robot = STARE_ZONA_C;
     }
   } else {
     asteptareReconectare(1);
   }
 }
-
 void handleStareZona_A(int RSSI, int obiect_detectat) {
   Serial.println("DEBUG - STARE_ZONA_A");
 
@@ -360,13 +358,13 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
   
   if (isConnectedToStation(1)) {
     if (obiect_detectat == 1) {
-      Serial.println("DEBUG - Obiect detectat vizual. Activare pozitionare.");
+      Serial.println("DEBUG - STARE_ZONA_A - Obiect detectat vizual. - Activare POZITIONARE.");
       activeazaTaskuri_Deplasare(false, false, true);
     } else if (RSSI > PROX_RSSI_MAX) {
-      Serial.println("DEBUG - RSSI puternic. Activare cautare stationara.");
+      Serial.println("DEBUG - STARE_ZONA_A - RSSI puternic.          - Activare STATIONARA.");
       activeazaTaskuri_Deplasare(false, true, false);
     } else {
-      Serial.println("DEBUG - RSSI slab. Activare urmarire.");
+      Serial.println("DEBUG - STARE_ZONA_A - RSSI slab.              - Activare URMARIRE.");
       activeazaTaskuri_Deplasare(true, false, false);
     }
   } else {
@@ -374,7 +372,6 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
     asteptareReconectare(1);
   }
 }
-
 void handleStareZona_B(int RSSI) {
   Serial.println("DEBUG - STARE_ZONA_B");
 
@@ -382,13 +379,13 @@ void handleStareZona_B(int RSSI) {
 
   if (isConnectedToStation(2)) {
     if (RSSI > PROX_RSSI_MAX) {
-      Serial.println("DEBUG - In zona B. Executare eliberare.");
+      Serial.println("DEBUG - STARE_ZONA_B - Executare eliberare.");
       brat_eliberare();
       motoare_executieRetragere();
       digitalWrite(pinPWM, LOW);
       stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
     } else {
-      Serial.println("DEBUG - RSSI slab. Activare urmarire.");
+      Serial.println("DEBUG - STARE_ZONA_B - RSSI slab.              - Activare URMARIRE.");
       activeazaTaskuri_Deplasare(true, false, false);
     }
   } else {
@@ -396,7 +393,6 @@ void handleStareZona_B(int RSSI) {
     asteptareReconectare(2);
   }
 }
-
 void handleStareZona_C(int RSSI, int obiect_prezent) {
   Serial.println("DEBUG - STARE_ZONA_C");
 
@@ -404,7 +400,7 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
 
   if (isConnectedToStation(3)) {
     if (RSSI > PROX_RSSI_MAX) {
-      Serial.println("DEBUG - STARE_ZONA_C - RSSI puternic in zona C. Oprire si asteptare prezenta obiect.");
+      Serial.println("DEBUG - STARE_ZONA_C - PROXIMITATE - Oprire si asteptare prezenta obiect.");
       // verificare prezenta obiect zona A
       // stabilire conectare statia A
       conectareStatie = 1;
@@ -413,7 +409,7 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
       if (isConnectedToStation(1)) {
         int prezenta = obiect_prezent;
         while (!prezenta) {
-          Serial.println("DEBUG - STARE_ZONA_C - Asteptare prezenta obiect in zona A...");
+          Serial.println("DEBUG - STARE_ZONA_C - PROXIMITATE -  Asteptare prezenta obiect in zona A...");
           portENTER_CRITICAL(&muxUART);
           prezenta = obiect_prezent_zonaA;
           portEXIT_CRITICAL(&muxUART);
@@ -426,7 +422,7 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
       stareComport_Robot = STARE_ZONA_A;
       activeazaTaskuri_Deplasare(false, false, false);
     } else {
-      Serial.println("DEBUG - RSSI slab in zona C. Activare urmarire.");
+      Serial.println("DEBUG - STARE_ZONA_C - RSSI slab.              - Activare URMARIRE.");
       activeazaTaskuri_Deplasare(true, false, false);
     }
   } else {
@@ -434,7 +430,6 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
     asteptareReconectare(3);
   }
 }
-
 void activeazaTaskuri_Deplasare(bool urmarire, bool cautare, bool pozitionare) {
   if (urmarire) vTaskResume(handleTaskDeplasare_Urmarire);
   else vTaskSuspend(handleTaskDeplasare_Urmarire);
@@ -445,13 +440,11 @@ void activeazaTaskuri_Deplasare(bool urmarire, bool cautare, bool pozitionare) {
   if (pozitionare) vTaskResume(handleTaskDeplasare_PozitionareObiect);
   else vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
 }
-
 bool isConnectedToStation(int stationIndex) {
   return WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[stationIndex];
 }
-
 void asteptareReconectare(int conectareStare_local){
-  Serial.println("DEBUG - switch - retea incorecta - dezactivare handleTaskComportamentRobot");
+  Serial.println("DEBUG - asteptareReconectare");
   digitalWrite(pinPWM, LOW);
   
   portENTER_CRITICAL(&muxVarG);
@@ -463,7 +456,6 @@ void asteptareReconectare(int conectareStare_local){
   vTaskSuspend(handleTaskComportamentRobot);
   vTaskDelay(1);
 }
-
 // FUNCTII SETUP
 void setup_pini() {
   // setare pini pentru motoare
@@ -490,7 +482,6 @@ void setup_pini() {
   delay(100);
   servoAntena.write(90);
 }
-
 void initTaskuri(){
     xTaskCreatePinnedToCore(
     taskControl_servoAntena,       // functia
@@ -552,7 +543,6 @@ void initTaskuri(){
     1               // core 1
   );
 }
-
 void loop(){
   // loop continuu
 }
