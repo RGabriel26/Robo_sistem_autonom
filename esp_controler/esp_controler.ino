@@ -113,7 +113,6 @@ void setup() {
   // delay pentru asigurarea initializarilor si verificarilor
   delay(1000);
 }
-
 // Task 1: Verificare conexiune si orientarea antenei spre sursa de semnal wifi
 void taskControl_servoAntena(void *parameter) {
   while (true) {
@@ -174,7 +173,6 @@ void taskControl_servoAntena(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
-
 // Task 2: Control motoarelor pentru a duce unghiul de orientare spre zona tampon de mers inainte
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
@@ -202,6 +200,7 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
+// Task 3: Control motoarelor pentru cautare stationara
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
@@ -222,6 +221,7 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
+// Task 4: Control motoarelor pentru pozitionarea in dreptul obiectului
 void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - determinarea pozitiei de prindere
   // - activare brat_prindere()
@@ -240,7 +240,7 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
-// Task 3: Citire date de la ESP CAM prin UART
+// Task 5: Citire date de la ESP CAM prin UART
 void taskCitireUART(void *parameter){
   // - decodificare mesaj uart + salvare
   while (true) {
@@ -283,169 +283,188 @@ void taskCitireUART(void *parameter){
     vTaskDelay(1);
   }
 }
-// Task 4: Comportamentul robotului - logica de decizie
+// Task 6: Comportamentul robotului - logica de decizie
 void taskComportamentRobot(void *parameter) {
-  while (1) {
-  // activare task uri de deplasare
-  task_cautareStationara = 1; 
-  task_pozitionare = 1; 
-  task_urmarire = 1; 
+  while (true) {
+    // actualizare variabile locale sincronizate
+    portENTER_CRITICAL(&muxVarG);
+    int statieCurenta = conectareStatie;
+    portEXIT_CRITICAL(&muxVarG);
 
-  portENTER_CRITICAL(&muxVarG);
-  int conectareStare_local = conectareStatie;
-  portEXIT_CRITICAL(&muxVarG);
-  
-  portENTER_CRITICAL(&muxRSSI);
-  int valoareRSSI_local = valoareRSSI;
-  portEXIT_CRITICAL(&muxRSSI);
-  
-  portENTER_CRITICAL(&muxUART);
-  int prezentaObiect_zonaA_local = prezentaObiect_zonaA;
-  int obiect_detectat_local = obiect_detectat;
-  portEXIT_CRITICAL(&muxUART);
+    portENTER_CRITICAL(&muxRSSI);
+    int rssi_local = valoareRSSI;
+    portEXIT_CRITICAL(&muxRSSI);
 
-  Serial.println("");
-  Serial.println("TEST:");
-  Serial.print("TEST - pin de pwm: ");
-  Serial.println(digitalRead(pinPWM));
-  Serial.print("TEST - statie conectata: ");
-  Serial.println(WiFi.SSID());
-  Serial.print("TEST - stare: ");
-  Serial.println(stareComport_Robot);
-  Serial.print("TEST - prezenta obiect: ");
-  Serial.println(prezentaObiect_zonaA);
-  Serial.print("TEST - valoare RSSI: ");
-  Serial.println(valoareRSSI_local);
+    portENTER_CRITICAL(&muxUART);
+    int prezenta_local = prezentaObiect_zonaA;
+    int obiect_detectat_local = obiect_detectat;
+    portEXIT_CRITICAL(&muxUART);
 
-  switch (stareComport_Robot) {
-    case STARE_VERIFICARE_PREZENTA_OBIECT:
-      Serial.println("TEST - switch 1 - STARE VERIFICARE");
-      conectareStare_local = 1;
-      vTaskSuspend(handleTaskDeplasare_Urmarire);
-      if (isConnectedToStation(conectareStare_local)) {
-        vTaskDelay(3000);
-        if (prezentaObiect_zonaA_local) {
-          Serial.println("DEBUG - switch - prezenta obiect - salt stare A");
-          stareComport_Robot = STARE_ZONA_A;
-        } else {
-          Serial.println("DEBUG - switch - absenta obiect  - salt stare C ");
-          stareComport_Robot = STARE_ZONA_C;
-        }
-      } else {
-        if (conectareStare_local >= 0 && conectareStare_local < sizeof(ssid_statie) / sizeof(ssid_statie[0])) {
-            asteptareReconectare(conectareStare_local);
-        } else {
-            Serial.println("ERROR: Invalid conectareStare_local value.");
-        }
-      }
-      break;
+    // debug scurt
+    Serial.println("\n=== DEBUG COMPORTAMENT ===");
+    Serial.print("SSID: "); Serial.println(WiFi.SSID());
+    Serial.print("STARE: "); Serial.println(stareComport_Robot);
+    Serial.print("RSSI: "); Serial.println(rssi_local);
+    Serial.print("PREZENTA: "); Serial.println(prezenta_local);
+    Serial.print("OBIECT DETECTAT: "); Serial.println(obiect_detectat_local);
 
-    case STARE_ZONA_A:
-      Serial.println("DEBUG - switch 2 - STARE A");
-      conectareStare_local = 1;
-      vTaskSuspend(handleTaskDeplasare_Urmarire);
-      if (isConnectedToStation(conectareStare_local)) {
-        if (obiect_detectat_local == 1) {
-          Serial.println("DEBUG - switch 2 - OBIECT DETECTAT VIDEO - TASK POZITIONARE OBC");
-          vTaskResume(handleTaskDeplasare_PozitionareObiect);
-          vTaskSuspend(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_CautareStationara);
-        }
-        if (valoareRSSI_local > PROX_RSSI_MAX) {
-          Serial.println("DEBUG - switch 2 - IN ZONA PROXIMITATE - TASK CAUTARE STATIONARA");
-          vTaskResume(handleTaskDeplasare_CautareStationara);
-          vTaskSuspend(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        } else {
-          Serial.println("DEBUG - switch 2 - OUT ZONA PROXIMITATE - TASK URMARIRE");
-          vTaskResume(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_CautareStationara);
-          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        }
-      } else {
-        vTaskSuspend(handleTaskDeplasare_Urmarire);
-        vTaskSuspend(handleTaskDeplasare_CautareStationara);
-        vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        asteptareReconectare(conectareStare_local);
-      }
-      break;
+    // executie comportament pe baza starii
+    switch (stareComport_Robot) {
+      case STARE_VERIFICARE_PREZENTA_OBIECT:
+        handleStare_Verificare(prezenta_local);
+        break;
 
-    case STARE_ZONA_B:
-      Serial.println("DEBUG - switch 3 - STARE B");
-      conectareStare_local = 2;
-      vTaskSuspend(handleTaskDeplasare_Urmarire);
-      if (isConnectedToStation(conectareStare_local)) {
-        if (valoareRSSI_local > PROX_RSSI_MAX) {
-          Serial.println("DEBUG - switch 3 - IN ZONA PROXIMITATE - EXECUTARE ELIBERARE");
-          brat_eliberare();
-          motoare_executieRetragere();
-          stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
-        } else {
-          Serial.println("DEBUG - switch 3 - OUT ZONA PROXIMITATE - TASK URMARIRE");
-          vTaskResume(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_CautareStationara);
-          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        }
-      } else {
-        vTaskSuspend(handleTaskDeplasare_Urmarire);
-        vTaskSuspend(handleTaskDeplasare_CautareStationara);
-        vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        asteptareReconectare(conectareStare_local);
-      }
-      break;
+      case STARE_ZONA_A:
+        handleStareZona_A(rssi_local, obiect_detectat_local);
+        break;
 
-    case STARE_ZONA_C:
-      Serial.println("DEBUG - switch 4 - STARE C");
-      conectareStare_local = 3;
-      vTaskSuspend(handleTaskDeplasare_Urmarire);
-      if (isConnectedToStation(conectareStare_local)) {
-        if (valoareRSSI_local > PROX_RSSI_MAX) {
-          Serial.println("DEBUG - switch 4 - IN ZONA PROXIMITATE - EXECUTARE OPRIRE - VERIFICARE PREZENTA OBIECT");
-          // e executa oprirea si se asteapta conectarea la o statia A
-          digitalWrite(pinPWM, LOW);
-          conectareStare_local = 1;
-          portENTER_CRITICAL(&muxVarG);
-          conectareStatie = conectareStare_local;
-          portEXIT_CRITICAL(&muxVarG); 
+      case STARE_ZONA_B:
+        handleStareZona_B(rssi_local);
+        break;
 
-          vTaskSuspend(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_CautareStationara);
-          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-          vTaskSuspend(handleTaskComportamentRobot);
-          // conectare realizata cand se reactiveaza task ul comportamental
-          Serial.println("DEBUG - switch 4 - IN ZONA PROXIMITATE - EXECUTARE OPRIRE - ASTEPTARE DUPA prezentaObiect_zonaA.....");
+      case STARE_ZONA_C:
+        handleStareZona_C(rssi_local);
+        break;
 
-          int prezentaObiect_zonaA_local = 0;
-          while(!prezentaObiect_zonaA_local){
-            portENTER_CRITICAL(&muxUART);
-            prezentaObiect_zonaA_local = prezentaObiect_zonaA;
-            portEXIT_CRITICAL(&muxUART);
-            vTaskDelay(1000);
-          }
-          
-          stareComport_Robot = STARE_ZONA_A;          
-        } else {
-          Serial.println("DEBUG - switch 4 - OUT ZONA PROXIMITATE - TASK URMARIRE");
-          vTaskResume(handleTaskDeplasare_Urmarire);
-          vTaskSuspend(handleTaskDeplasare_CautareStationara);
-          vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        }
-      } else {
-        vTaskSuspend(handleTaskDeplasare_Urmarire);
-        vTaskSuspend(handleTaskDeplasare_CautareStationara);
-        vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
-        asteptareReconectare(conectareStare_local);
-      }
-      break;
-
-    case STARE_REPAUS:
-      // Momenta nu este folosit acest caz, posibil utilizabil pentru update urile viitoare
-      break;
+      case STARE_REPAUS:
+        break;
     }
-    vTaskDelay(1); // delay scurt pentru cooperativitate
+
+    vTaskDelay(500);
   }
 }
 
+void handleStare_Verificare(int prezenta) {
+  Serial.println("DEBUG - STARE_VERIFICARE");
+
+  conectareStatie = 1;
+
+  if (isConnectedToStation(1)) {
+    vTaskDelay(3000);
+    if (prezenta) {
+      Serial.println("DEBUG - Obiect prezent. Trecere la STARE_ZONA_A.");
+      stareComport_Robot = STARE_ZONA_A;
+    } else {
+      Serial.println("DEBUG - Obiect absent. Trecere la STARE_ZONA_C.");
+      stareComport_Robot = STARE_ZONA_C;
+    }
+  } else {
+    asteptareReconectare(1);
+  }
+}
+
+void handleStareZona_A(int RSSI, int obiect_detectat) {
+  Serial.println("DEBUG - STARE_ZONA_A");
+
+  conectareStatie = 1;
+  
+  if (isConnectedToStation(1)) {
+    if (obiect_detectat == 1) {
+      Serial.println("DEBUG - Obiect detectat vizual. Activare pozitionare.");
+      activeazaTaskuri_Deplasare(false, false, true);
+    } else if (RSSI > PROX_RSSI_MAX) {
+      Serial.println("DEBUG - RSSI puternic. Activare cautare stationara.");
+      activeazaTaskuri_Deplasare(false, true, false);
+    } else {
+      Serial.println("DEBUG - RSSI slab. Activare urmarire.");
+      activeazaTaskuri_Deplasare(true, false, false);
+    }
+  } else {
+    activeazaTaskuri_Deplasare(false, false, false);
+    asteptareReconectare(1);
+  }
+}
+
+void handleStareZona_B(int RSSI) {
+  Serial.println("DEBUG - STARE_ZONA_B");
+
+  conectareStatie = 2;
+
+  if (isConnectedToStation(2)) {
+    if (RSSI > PROX_RSSI_MAX) {
+      Serial.println("DEBUG - In zona B. Executare eliberare.");
+      brat_eliberare();
+      motoare_executieRetragere();
+      digitalWrite(pinPWM, LOW);
+      stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
+    } else {
+      Serial.println("DEBUG - RSSI slab. Activare urmarire.");
+      activeazaTaskuri_Deplasare(true, false, false);
+    }
+  } else {
+    activeazaTaskuri_Deplasare(false, false, false);
+    asteptareReconectare(2);
+  }
+}
+
+void handleStareZona_C(int RSSI) {
+  Serial.println("DEBUG - STARE_ZONA_C");
+
+  conectareStatie = 3;
+
+  if (isConnectedToStation(3)) {
+    if (RSSI > PROX_RSSI_MAX) {
+      Serial.println("DEBUG - STARE_ZONA_C - RSSI puternic in zona C. Oprire si asteptare prezenta obiect.");
+      // verificare prezenta obiect zona A
+      // stabilire conectare statia A
+      conectareStatie = 1;
+      activeazaTaskuri_Deplasare(false, false, false);
+      asteptareReconectare(1);
+      if (isConnectedToStation(1)) {
+        int prezenta = 0;
+        while (!prezenta) {
+          Serial.println("DEBUG - STARE_ZONA_C - Asteptare prezenta obiect in zona A...");
+          portENTER_CRITICAL(&muxUART);
+          prezenta = prezentaObiect_zonaA;
+          portEXIT_CRITICAL(&muxUART);
+          vTaskDelay(1000);
+        }
+      }else{
+        Serial.println("DEBUG - STARE_ZONA_C - CONECTARE ZONA_A - ESUATA");
+      }
+      Serial.println("DEBUG - STARE_ZONA_C - Obiect prezent in zona A. Trecere la STARE_ZONA_A.");
+      stareComport_Robot = STARE_ZONA_A;
+      activeazaTaskuri_Deplasare(false, false, false);
+    } else {
+      Serial.println("DEBUG - RSSI slab in zona C. Activare urmarire.");
+      activeazaTaskuri_Deplasare(true, false, false);
+    }
+  } else {
+    activeazaTaskuri_Deplasare(false, false, false);
+    asteptareReconectare(3);
+  }
+}
+
+void activeazaTaskuri_Deplasare(bool urmarire, bool cautare, bool pozitionare) {
+  if (urmarire) vTaskResume(handleTaskDeplasare_Urmarire);
+  else vTaskSuspend(handleTaskDeplasare_Urmarire);
+
+  if (cautare) vTaskResume(handleTaskDeplasare_CautareStationara);
+  else vTaskSuspend(handleTaskDeplasare_CautareStationara);
+
+  if (pozitionare) vTaskResume(handleTaskDeplasare_PozitionareObiect);
+  else vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
+}
+
+bool isConnectedToStation(int stationIndex) {
+  return WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[stationIndex];
+}
+
+void asteptareReconectare(int conectareStare_local){
+  Serial.println("DEBUG - switch - retea incorecta - dezactivare handleTaskComportamentRobot");
+  digitalWrite(pinPWM, LOW);
+  
+  portENTER_CRITICAL(&muxVarG);
+  conectareStatie = conectareStare_local;
+  portEXIT_CRITICAL(&muxVarG); 
+
+  servoAntena.write(90);
+
+  vTaskSuspend(handleTaskComportamentRobot);
+  vTaskDelay(1);
+}
+
+// FUNCTII SETUP
 void setup_pini() {
   // setare pini pentru motoare
   pinMode(DRIVER_A_IN1, OUTPUT);
@@ -532,24 +551,6 @@ void initTaskuri(){
     &handleTaskComportamentRobot,
     1               // core 1
   );
-}
-
-bool isConnectedToStation(int stationIndex) {
-  return WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[stationIndex];
-}
-
-void asteptareReconectare(int conectareStare_local){
-  Serial.println("DEBUG - switch - retea incorecta - dezactivare handleTaskComportamentRobot");
-  digitalWrite(pinPWM, LOW);
-  
-  portENTER_CRITICAL(&muxVarG);
-  conectareStatie = conectareStare_local;
-  portEXIT_CRITICAL(&muxVarG); 
-
-  servoAntena.write(90);
-
-  vTaskSuspend(handleTaskComportamentRobot);
-  vTaskDelay(1);
 }
 
 void loop(){
