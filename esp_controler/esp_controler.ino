@@ -102,7 +102,13 @@ void setup() {
   delay(1000);
   digitalWrite(pinPWM, LOW); // setat in HIGH pentru tensiune continua de 3.3V, echivalent PWM 100 %
 }
-// Task 1: Verificare conexiune si orientarea antenei spre sursa de semnal wifi
+
+/**
+ * @brief Task pentru controlul antenei și orientarea spre sursa de semnal Wi-Fi.
+ * 
+ * Conectează robotul la rețeaua Wi-Fi specificată, determină unghiul de orientare,
+ * și citește datele RSSI. Activează task-ul comportamental după conectare.
+ */
 void taskControl_servoAntena(void *parameter) {
   while (true) {
     portENTER_CRITICAL(&muxVarG);
@@ -160,7 +166,11 @@ void taskControl_servoAntena(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
-// Task 2: Control motoarelor pentru a duce unghiul de orientare spre zona tampon de mers inainte
+/**
+ * @brief Task pentru deplasarea robotului în funcție de unghiul detectat de antenă.
+ * 
+ * Robotul se rotește sau avansează pentru a se alinia cu direcția sursei de semnal.
+ */
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
   while (true) {
@@ -185,7 +195,11 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
-// Task 3: Control motoarelor pentru cautare stationara
+/**
+ * @brief Task pentru efectuarea unei căutări staționare a stației prin rotație stânga-dreapta.
+ * 
+ * Folosit când semnalul este slab, robotul oscilează pentru a găsi o direcție mai bună.
+ */
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
@@ -204,7 +218,11 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
-// Task 4: Control motoarelor pentru pozitionarea in dreptul obiectului
+/**
+ * @brief Task pentru poziționarea robotului în dreptul obiectului detectat.
+ * 
+ * Inițiază secvențele de prindere cu brațul, retragerea din stație și actualizarea stării.
+ */
 void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - determinarea pozitiei de prindere
   // - activare brat_prindere()
@@ -220,7 +238,11 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
 }
-// Task 5: Citire date de la ESP CAM prin UART
+/**
+ * @brief Task pentru citirea datelor de la ESP-CAM prin UART.
+ * 
+ * Decodifică mesajele primite, determină dacă un obiect este detectat și salvează coordonatele.
+ */
 void taskCitireUART(void *parameter){
   // - decodificare mesaj uart + salvare
   while (true) {
@@ -263,7 +285,11 @@ void taskCitireUART(void *parameter){
     vTaskDelay(1);
   }
 }
-// Task 6: Comportamentul robotului - logica de decizie
+/**
+ * @brief Taskul principal de comportament al robotului – controlează starea sistemului.
+ * 
+ * În funcție de context (RSSI, detecția obiectului, prezența în zonă), comută între stări și activează task-uri.
+ */
 void taskComportamentRobot(void *parameter) {
   while (true) {
     vTaskResume(handleTaskControl_servoAntena);
@@ -316,7 +342,11 @@ void taskComportamentRobot(void *parameter) {
     vTaskDelay(500);
   }
 }
-
+/**
+ * @brief Tratează starea inițială – verifică dacă există obiect în zona A.
+ * 
+ * Dacă este prezent obiectul, comută către STARE_ZONA_A, altfel către STARE_ZONA_C.
+ */
 void handleStare_Verificare(int obiect_prezent) {
   Serial.println("DEBUG - STARE_VERIFICARE");
 
@@ -335,6 +365,11 @@ void handleStare_Verificare(int obiect_prezent) {
     asteptareReconectare(1);
     }
 }
+/**
+ * @brief Tratează comportamentul robotului când este în zona A.
+ * 
+ * Activează task-urile corespunzătoare în funcție de intensitatea RSSI și prezența obiectului.
+ */
 void handleStareZona_A(int RSSI, int obiect_detectat) {
   Serial.println("DEBUG - STARE_ZONA_A");
 
@@ -356,6 +391,11 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
     asteptareReconectare(1);
   }
 }
+/**
+ * @brief Tratează comportamentul robotului în zona B (eliberare obiect).
+ * 
+ * Eliberează obiectul și execută retragerea, apoi revine la verificarea prezenței.
+ */
 void handleStareZona_B(int RSSI) {
   Serial.println("DEBUG - STARE_ZONA_B");
 
@@ -377,6 +417,11 @@ void handleStareZona_B(int RSSI) {
     asteptareReconectare(2);
   }
 }
+/**
+ * @brief Tratează comportamentul robotului în zona C (așteptare pentru apariția obiectului).
+ * 
+ * Verifică RSSI și prezența obiectului în zona A înainte de a comuta înapoi în STARE_ZONA_A.
+ */
 void handleStareZona_C(int RSSI, int obiect_prezent) {
   Serial.println("DEBUG - STARE_ZONA_C");
 
@@ -414,7 +459,13 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
     asteptareReconectare(3);
   }
 }
-
+/**
+ * @brief Activează sau suspendă task-urile de deplasare pe baza semnalului de control.
+ * 
+ * @param urmarire Activează task-ul de urmărire
+ * @param cautare Activează task-ul de căutare staționară
+ * @param pozitionare Activează task-ul de poziționare obiect
+ */
 void activeazaTaskuri_Deplasare(bool urmarire, bool cautare, bool pozitionare) {
   if (urmarire) vTaskResume(handleTaskDeplasare_Urmarire);
   else vTaskSuspend(handleTaskDeplasare_Urmarire);
@@ -425,9 +476,20 @@ void activeazaTaskuri_Deplasare(bool urmarire, bool cautare, bool pozitionare) {
   if (pozitionare) vTaskResume(handleTaskDeplasare_PozitionareObiect);
   else vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
 }
+/**
+ * @brief Verifică dacă robotul este conectat la o anumită stație Wi-Fi.
+ * 
+ * @param stationIndex Indexul stației (1 = A, 2 = B, 3 = C)
+ * @return true dacă este conectat, false altfel.
+ */
 bool isConnectedToStation(int stationIndex) {
   return WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid_statie[stationIndex];
 }
+/**
+ * @brief Suspendă temporar execuția și încearcă reconectarea la stația dorită.
+ * 
+ * @param conectareStare_local Indexul stației către care se dorește reconectarea.
+ */
 void asteptareReconectare(int conectareStare_local){
   Serial.println("DEBUG - asteptareReconectare");
   digitalWrite(pinPWM, LOW);
@@ -441,7 +503,9 @@ void asteptareReconectare(int conectareStare_local){
   vTaskSuspend(handleTaskComportamentRobot);
   vTaskDelay(1);
 }
-// FUNCTII SETUP
+/**
+ * @brief Inițializează pinii hardware.
+ */
 void setup_pini() {
   // setare pini pentru motoare
   pinMode(DRIVER_A_IN1, OUTPUT);
@@ -467,7 +531,11 @@ void setup_pini() {
   delay(100);
   servoAntena.write(90);
 }
-// initializare taskuri
+/**
+ * @brief Inițializează toate task-urile FreeRTOS utilizate de sistem.
+ * 
+ * Creează și suspendă inițial toate task-urile pentru controlul antenei, deplasare și comunicare.
+ */
 void initTaskuri(){
     xTaskCreatePinnedToCore(
     taskControl_servoAntena,       // functia
@@ -534,7 +602,11 @@ void initTaskuri(){
     1               // core 1
   );
 }
-
+/**
+ * @brief Funcție goală de tip loop() specifică Arduino. Nu este folosită în acest sistem.
+ */
 void loop(){
-  // loop continuu
+  // Nu este necesară o funcție loop() în acest sistem, deoarece toate operațiunile sunt gestionate de task-uri FreeRTOS.
+  // Task-urile rulează în fundal și gestionează comportamentul robotului.
+  vTaskDelay(1000); // Delay pentru a evita blocarea CPU, dacă este necesar.
 }
