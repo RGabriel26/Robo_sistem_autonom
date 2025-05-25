@@ -29,7 +29,7 @@ void connect_statie(const char* ssid, const char* password) {
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     while (WiFi.status() != WL_CONNECTED) {
-        delay(500);
+        vTaskDelay(500);
         Serial.print(".");
     }
     if (WiFi.SSID() == ssid_statie[1]) udpReceiver.begin(localPort);
@@ -63,11 +63,11 @@ int det_unghi_orientare(int &rssi_max_out) {
 
         for (int unghi = interval[0]; unghi <= interval[1]; unghi += PAS_UNGHI) {
             servoAntena.write(unghi);
-            delay(DELAY_UNGHI);
+            vTaskDelay(DELAY_UNGHI);
             int rssi = 0;
             for (int i = 0; i < 5; i++) {
                 rssi += WiFi.RSSI();
-                delay(5);
+                vTaskDelay(5);
             }
             rssi /= 5;
 
@@ -81,11 +81,11 @@ int det_unghi_orientare(int &rssi_max_out) {
 
         for (int unghi = interval[1]; unghi >= interval[0]; unghi -= PAS_UNGHI) {
             servoAntena.write(unghi);
-            delay(DELAY_UNGHI);
+            vTaskDelay(DELAY_UNGHI);
             int rssi = 0;
             for (int i = 0; i < 5; i++) {
                 rssi += WiFi.RSSI();
-                delay(5);
+                vTaskDelay(5);
             }
 
             if (rssi > max_rssi) {

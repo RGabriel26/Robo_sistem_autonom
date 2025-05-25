@@ -1,6 +1,3 @@
-#include <ROBO_detect_inferencing.h>
-
-#include <ROBO_detect_inferencing.h>
 
 #include "motoare.h" // functii destinate deplasarii 
 #include "antena_control.h" // funtii destinate orientarii antenei
@@ -182,6 +179,7 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
   while (true) {
     if (task_urmarire){
+      Serial.println("\n=== DEBUG - taskControl_Deplasare_Urmarire ===");
       //digitalWrite(pinPWM, HIGH);
       // Serial.println("DEGUB - taskControl_Deplasare_Urmarire - intrat in executie");
       // Serial.print("DEGUB - taskControl_Deplasare_Urmarire - pin pwm: ");
@@ -209,6 +207,7 @@ void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
     if (task_cautareStationara){
+    Serial.println("\n=== DEBUG - taskControl_Deplasare_CautareStationare ===");
     //digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_CautareStationare - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_CautareStationare - pin pwm: ");
@@ -353,7 +352,7 @@ void handleStare_Verificare(int obiect_prezent) {
     }
   } else {
     asteptareReconectare(1);
-  }
+    }
 }
 void handleStareZona_A(int RSSI, int obiect_detectat) {
   Serial.println("DEBUG - STARE_ZONA_A");

@@ -25,13 +25,13 @@ void init_brat() {
 
 void brat_prindere() {
   servoHead.write(POZ_SERVO_HEAD_RIDICAT);
-  delay(DELAY_MOVE_ARM);
+  vTaskDelay(DELAY_MOVE_ARM);
   servoBase.write(POZ_SERVO_BASE_RIDICAT);
 }
 
 void brat_eliberare() {
   servoBase.write(POZ_SERVO_BASE_DEFAULT);
-  delay(DELAY_MOVE_ARM);
+  vTaskDelay(DELAY_MOVE_ARM);
   servoHead.write(POZ_SERVO_HEAD_DEFAULT);
 }
 
