@@ -26,6 +26,7 @@
 /* Includes ---------------------------------------------------------------- */
 #include <ROBO_licenta_inferencing.h>
 #include "edge-impulse-sdk/dsp/image/image.hpp"
+#include <HardwareSerial.h>
 
 #include "esp_camera.h"
 
@@ -130,6 +131,9 @@ bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf
 */
 void setup()
 {
+    // CONFIGURARE UART PENTRU TRIMITEREA PACHETELOR DE DATE
+    Serial1.begin(9600, SERIAL_8N1, /*RX=*/-1, /*TX=*/14);
+
     // put your setup code here, to run once:
     Serial.begin(115200);
     //comment out the below line to start inference immediately after upload
@@ -192,6 +196,7 @@ void loop()
 
 #if EI_CLASSIFIER_OBJECT_DETECTION == 1
     ei_printf("Object detection bounding boxes:\r\n");
+    bool obiect_detectat_flag = false;
     for (uint32_t i = 0; i < result.bounding_boxes_count; i++) {
         ei_impulse_result_bounding_box_t bb = result.bounding_boxes[i];
         if (bb.value == 0) {
@@ -204,6 +209,21 @@ void loop()
                 bb.y,
                 bb.width,
                 bb.height);
+        // verificarea daca s-a detectat obiectul dorit si impachetarea coordonatelor pentru a fi trimise
+        if (bb.label == "obiect"){
+            if(bb.value < 0.7) {
+                ei_printf("Detected object with low confidence, skipping sending data.\r\n");
+                continue;
+            }
+            String mesaj_uart = "<START>" + String(bb.x) + "," + String(bb.y) + "," + String(bb.width) + "," + String(bb.height) + "<END>";
+            Serial1.print(mesaj_uart);
+            obiect_detectat_flag = true;
+            ei_printf("<...DEBUGING...> PACHET DE DATE TRIMIS\r\n");
+        }
+    }
+    if (!obiect_detectat_flag) {
+        Serial1.print("<START>NO_OBJ<END>");
+        ei_printf("<...DEBUGING...> NU S-A DETECTAT OBIECTUL DORIT\r\n");
     }
 
     // Print the prediction results (classification)

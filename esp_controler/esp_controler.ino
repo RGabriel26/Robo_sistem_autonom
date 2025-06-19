@@ -174,7 +174,7 @@ void taskControl_servoAntena(void *parameter) {
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
   while (true) {
-    Serial.println("\n=== DEBUG - taskControl_Deplasare_Urmarire ===");
+    //Serial.println("\n=== DEBUG - taskControl_Deplasare_Urmarire ===");
     //digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_Urmarire - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_Urmarire - pin pwm: ");
@@ -203,7 +203,7 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
-    Serial.println("\n=== DEBUG - taskControl_Deplasare_CautareStationare ===");
+    //Serial.println("\n=== DEBUG - taskControl_Deplasare_CautareStationare ===");
     //digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_CautareStationare - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_CautareStationare - pin pwm: ");
@@ -229,7 +229,7 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - activare motoare_executieRetragere()
   // - schimbare stare - STARE_STATIA_B
   while (true) {
-      Serial.println("\n=== DEBUG - taskControl_Deplasare_PozitionareObiect ===");
+    //Serial.println("\n=== DEBUG - taskControl_Deplasare_PozitionareObiect ===");
     // digitalWrite(pinPWM, HIGH);
     // Serial.println("DEGUB - taskControl_Deplasare_PozitionareObiect - intrat in executie");
     // Serial.print("DEGUB - taskControl_Deplasare_PozitionareObiect - pin pwm: ");
@@ -245,12 +245,12 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
  */
 void taskCitireUART(void *parameter){
   // - decodificare mesaj uart + salvare
+  String buffer = "";
+  
   while (true) {
-    String buffer = "";
     while (Serial1.available()) {
       char c = Serial1.read();
       buffer += c;
-
       if (buffer.endsWith("<END>")) {
         int x, y, w, h;
         int start = buffer.indexOf("<START>") + 7;
@@ -260,6 +260,10 @@ void taskCitireUART(void *parameter){
         if (continut == "NO_OBJ") {
           portENTER_CRITICAL(&muxUART);
           obiect_detectat = 0;
+          obiect_x = 0;
+          obiect_y = 0;
+          obiect_w = 0;
+          obiect_h = 0;
           portEXIT_CRITICAL(&muxUART);
         } else {
           int index1 = continut.indexOf(",");
@@ -282,7 +286,7 @@ void taskCitireUART(void *parameter){
         buffer = "";
       }
     }
-    vTaskDelay(1);
+    vTaskDelay(10);
   }
 }
 /**
@@ -307,6 +311,10 @@ void taskComportamentRobot(void *parameter) {
     portENTER_CRITICAL(&muxUART);
     int obiect_prezent_local  = obiect_prezent_zonaA;
     int obiect_detectat_local = obiect_detectat;
+    int obiect_x_local = ::obiect_x; 
+    int obiect_y_local = ::obiect_y;    
+    int obiect_w_local = ::obiect_w;
+    int obiect_h_local = ::obiect_h;
     portEXIT_CRITICAL(&muxUART);
 
     // debug scurt
@@ -314,8 +322,9 @@ void taskComportamentRobot(void *parameter) {
     Serial.print("SSID: "); Serial.println(WiFi.SSID());
     Serial.print("STARE: "); Serial.println(stareComport_Robot);
     Serial.print("RSSI: "); Serial.println(rssi_local);
-    Serial.print("PREZENTA: "); Serial.println(obiect_prezent_local);
+    Serial.print("OBIECT PREZENT: "); Serial.println(obiect_prezent_local);
     Serial.print("OBIECT DETECTAT: "); Serial.println(obiect_detectat_local);
+    Serial.print("OBIECT DETECTAT - COORDINATE: "); Serial.print(obiect_x_local); Serial.print(", "); Serial.print(obiect_y_local); Serial.print(", "); Serial.print(obiect_w_local); Serial.print(", "); Serial.println(obiect_h_local);
 
     // executie comportament pe baza starii
     switch (stareComport_Robot) {
@@ -339,7 +348,7 @@ void taskComportamentRobot(void *parameter) {
         break;
     }
 
-    vTaskDelay(500);
+    vTaskDelay(100);
   }
 }
 /**
