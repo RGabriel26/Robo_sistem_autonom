@@ -89,7 +89,7 @@ void setup() {
   // setare UART 0 in cazul debugging ului
   Serial.begin(115200);
   // setare UART 1 pentru primirea pachetelor de date de la ESP CAM
-  Serial1.begin(9600, SERIAL_8N1, 35, -1);
+  Serial1.begin(115200, SERIAL_8N1, 35, -1);
   // initializare pini control motoare / drivere
   setup_pini();
   // initializare brat
@@ -174,12 +174,6 @@ void taskControl_servoAntena(void *parameter) {
 void taskControl_Deplasare_Urmarire(void *parameter) {
   // control dupa unghiul de comanda al servomotorului anatenei
   while (true) {
-    //Serial.println("\n=== DEBUG - taskControl_Deplasare_Urmarire ===");
-    //digitalWrite(pinPWM, HIGH);
-    // Serial.println("DEGUB - taskControl_Deplasare_Urmarire - intrat in executie");
-    // Serial.print("DEGUB - taskControl_Deplasare_Urmarire - pin pwm: ");
-    // Serial.println(digitalRead(pinPWM));
-
     // protectie la citire
     portENTER_CRITICAL(&muxUNGHI);
     int unghiProvenienta_local = unghiOrientare;
@@ -203,11 +197,6 @@ void taskControl_Deplasare_Urmarire(void *parameter) {
 void taskControl_Deplasare_CautareStationare(void *parameter) {
   // comenzi repetate de stanga - dreapta
   while (true) {
-    //Serial.println("\n=== DEBUG - taskControl_Deplasare_CautareStationare ===");
-    //digitalWrite(pinPWM, HIGH);
-    // Serial.println("DEGUB - taskControl_Deplasare_CautareStationare - intrat in executie");
-    // Serial.print("DEGUB - taskControl_Deplasare_CautareStationare - pin pwm: ");
-    // Serial.println(digitalRead(pinPWM));
     motoare_rotireDreapta();
     vTaskDelay(500);
     motoare_rotireStanga();
@@ -229,11 +218,14 @@ void taskControl_Deplasare_PozitionareObiect(void *parameter) {
   // - activare motoare_executieRetragere()
   // - schimbare stare - STARE_STATIA_B
   while (true) {
-    //Serial.println("\n=== DEBUG - taskControl_Deplasare_PozitionareObiect ===");
-    // digitalWrite(pinPWM, HIGH);
-    // Serial.println("DEGUB - taskControl_Deplasare_PozitionareObiect - intrat in executie");
-    // Serial.print("DEGUB - taskControl_Deplasare_PozitionareObiect - pin pwm: ");
-    // Serial.println(digitalRead(pinPWM));
+    portENTER_CRITICAL(&muxUART);
+    int obiect_detectat_local = ::obiect_detectat;
+    int obiect_x_local = ::obiect_x;
+    int obiect_y_local = ::obiect_y;
+    int obiect_w_local = ::obiect_w;
+    int obiect_h_local = ::obiect_h;
+    portEXIT_CRITICAL(&muxUART);
+
 
     vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
   }
@@ -301,16 +293,16 @@ void taskComportamentRobot(void *parameter) {
 
     // actualizare variabile locale sincronizate
     portENTER_CRITICAL(&muxVarG);
-    int statieCurenta = conectareStatie;
+    int statieCurenta = ::conectareStatie;
     portEXIT_CRITICAL(&muxVarG);
 
     portENTER_CRITICAL(&muxRSSI);
-    int rssi_local = valoareRSSI;
+    int rssi_local = ::valoareRSSI;
     portEXIT_CRITICAL(&muxRSSI);
 
     portENTER_CRITICAL(&muxUART);
-    int obiect_prezent_local  = obiect_prezent_zonaA;
-    int obiect_detectat_local = obiect_detectat;
+    int obiect_prezent_local  = ::obiect_prezent_zonaA;
+    int obiect_detectat_local = ::obiect_detectat;
     int obiect_x_local = ::obiect_x; 
     int obiect_y_local = ::obiect_y;    
     int obiect_w_local = ::obiect_w;
@@ -359,16 +351,22 @@ void taskComportamentRobot(void *parameter) {
 void handleStare_Verificare(int obiect_prezent) {
   Serial.println("DEBUG - STARE_VERIFICARE");
 
+  portENTER_CRITICAL(&muxVarG);
   conectareStatie = 1;
+  portEXIT_CRITICAL(&muxVarG);
 
   if (isConnectedToStation(1)) {
     vTaskDelay(3000);
     if (obiect_prezent) {
       Serial.println("DEBUG - STARE_VERIFICARE - Obiect prezent. Trecere la STARE_ZONA_A.");
+      portENTER_CRITICAL(&muxVarG);
       stareComport_Robot = STARE_ZONA_A;
+      portEXIT_CRITICAL(&muxVarG);
     } else {
       Serial.println("DEBUG - STARE_VERIFICARE - Obiect absent. Trecere la STARE_ZONA_C.");
+      portENTER_CRITICAL(&muxVarG);
       stareComport_Robot = STARE_ZONA_C;
+      portEXIT_CRITICAL(&muxVarG);
     }
   } else {
     asteptareReconectare(1);
@@ -382,8 +380,10 @@ void handleStare_Verificare(int obiect_prezent) {
 void handleStareZona_A(int RSSI, int obiect_detectat) {
   Serial.println("DEBUG - STARE_ZONA_A");
 
+  portENTER_CRITICAL(&muxVarG);
   conectareStatie = 1;
-  
+  portEXIT_CRITICAL(&muxVarG);
+
   if (isConnectedToStation(1)) {
     if (obiect_detectat == 1) {
       Serial.println("DEBUG - STARE_ZONA_A - Obiect detectat vizual. - Activare POZITIONARE.");
@@ -408,7 +408,9 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
 void handleStareZona_B(int RSSI) {
   Serial.println("DEBUG - STARE_ZONA_B");
 
+  portENTER_CRITICAL(&muxVarG);
   conectareStatie = 2;
+  portEXIT_CRITICAL(&muxVarG);
 
   if (isConnectedToStation(2)) {
     if (RSSI > PROX_RSSI_MAX) {
@@ -416,7 +418,9 @@ void handleStareZona_B(int RSSI) {
       brat_eliberare();
       motoare_executieRetragere();
       digitalWrite(pinPWM, LOW);
+      portENTER_CRITICAL(&muxVarG);
       stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
+      portEXIT_CRITICAL(&muxVarG);
     } else {
       Serial.println("DEBUG - STARE_ZONA_B - RSSI slab.              - Activare URMARIRE.");
       activeazaTaskuri_Deplasare(true, false, false);
@@ -434,22 +438,26 @@ void handleStareZona_B(int RSSI) {
 void handleStareZona_C(int RSSI, int obiect_prezent) {
   Serial.println("DEBUG - STARE_ZONA_C");
 
+  portENTER_CRITICAL(&muxVarG);
   conectareStatie = 3;
+  portEXIT_CRITICAL(&muxVarG);
 
   if (isConnectedToStation(3)) {
     if (RSSI > PROX_RSSI_MAX) {
       Serial.println("DEBUG - STARE_ZONA_C - PROXIMITATE - Oprire si asteptare prezenta obiect.");
       // verificare prezenta obiect zona A
       // stabilire conectare statia A
+      portENTER_CRITICAL(&muxVarG);
       conectareStatie = 1;
+      portEXIT_CRITICAL(&muxVarG);
       activeazaTaskuri_Deplasare(false, false, false);
       asteptareReconectare(1);
       if (isConnectedToStation(1)) {
-        int prezenta = obiect_prezent;
+        int prezenta = 0;
         while (!prezenta) {
           Serial.println("DEBUG - STARE_ZONA_C - PROXIMITATE -  Asteptare prezenta obiect in zona A...");
           portENTER_CRITICAL(&muxUART);
-          prezenta = obiect_prezent_zonaA;
+          prezenta = ::obiect_prezent_zonaA;
           portEXIT_CRITICAL(&muxUART);
           vTaskDelay(1000);
         }
@@ -457,7 +465,9 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
         Serial.println("DEBUG - STARE_ZONA_C - CONECTARE ZONA_A - ESUATA");
       }
       Serial.println("DEBUG - STARE_ZONA_C - Obiect prezent in zona A. Trecere la STARE_ZONA_A.");
-      stareComport_Robot = STARE_ZONA_A;
+      portENTER_CRITICAL(&muxVarG);
+      ::stareComport_Robot = STARE_ZONA_A;
+      portEXIT_CRITICAL(&muxVarG);
       activeazaTaskuri_Deplasare(false, false, false);
     } else {
       Serial.println("DEBUG - STARE_ZONA_C - RSSI slab.              - Activare URMARIRE.");
@@ -504,7 +514,7 @@ void asteptareReconectare(int conectareStare_local){
   digitalWrite(pinPWM, LOW);
   
   portENTER_CRITICAL(&muxVarG);
-  conectareStatie = conectareStare_local;
+  ::conectareStatie = conectareStare_local;
   portEXIT_CRITICAL(&muxVarG); 
 
   servoAntena.write(90);

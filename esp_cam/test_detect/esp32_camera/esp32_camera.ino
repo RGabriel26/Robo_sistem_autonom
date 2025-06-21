@@ -132,7 +132,7 @@ bool ei_camera_capture(uint32_t img_width, uint32_t img_height, uint8_t *out_buf
 void setup()
 {
     // CONFIGURARE UART PENTRU TRIMITEREA PACHETELOR DE DATE
-    Serial1.begin(9600, SERIAL_8N1, /*RX=*/-1, /*TX=*/14);
+    Serial1.begin(115200, SERIAL_8N1, /*RX=*/-1, /*TX=*/14);
 
     // put your setup code here, to run once:
     Serial.begin(115200);
