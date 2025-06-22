@@ -28,6 +28,7 @@
  * Setează pinii driverelor pentru a roti toate roțile în direcția înainte.
  */
 void motoare_deplasareFata() {
+  digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -44,6 +45,7 @@ void motoare_deplasareFata() {
  * Inversează sensul de rotație al roților pentru mers înapoi.
  */
 void motoare_deplasareSpate() {
+  digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -60,6 +62,7 @@ void motoare_deplasareSpate() {
  * Controlează motoarele pentru a executa o întoarcere pe loc spre stânga.
  */
 void motoare_rotireStanga() {
+  digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -76,6 +79,7 @@ void motoare_rotireStanga() {
  * Controlează motoarele pentru a executa o întoarcere pe loc spre dreapta.
  */
 void motoare_rotireDreapta() {
+  digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -92,6 +96,7 @@ void motoare_rotireDreapta() {
  * Activează toate motoarele pentru a realiza o mișcare laterală stânga.
  */
 void motoare_verticalStanga() {
+  digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -108,6 +113,7 @@ void motoare_verticalStanga() {
  * Activează toate motoarele pentru a realiza o mișcare laterală dreapta.
  */
 void motoare_verticalDreapta() {
+  digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -124,6 +130,7 @@ void motoare_verticalDreapta() {
  * Setează toți pinii de control în LOW pentru a opri motorul.
  */
 void motoare_stop() {
+  digitalWrite(pinPWM, LOW);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -145,7 +152,7 @@ void motoare_executieRetragere(){
   vTaskDelay(500);
   motoare_rotireDreapta();
   vTaskDelay(1000);
-  digitalWrite(pinPWM, LOW);
+  motoare_stop();
 }
 
 #endif

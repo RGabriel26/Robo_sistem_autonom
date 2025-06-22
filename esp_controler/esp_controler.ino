@@ -58,8 +58,17 @@ enum StareComportament{             // enum folosit pentru determinarea executie
   STARE_ZONA_C, 
   STARE_REPAUS
 };
+
+enum TipDeplasare{              // enum folosit pentru controlul deplasarii robotului
+  DEPLASARE_URMARIRE, 
+  DEPLASARE_CAUTARE_STATIONARA, 
+  DEPLASARE_POZITIONARE_OBIECT,
+  DEPLASARE_STATIONARE
+};
+
 volatile int interval[2] = {LIM_INF , LIM_SUP};     // interval cu unghiurile pe care le va explora antena
 volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
+volatile int tipDeplasare = 0;                       // folosit pentru controlul deplasarii in task ul destinat {tipDeplasare -> 0 = stationare, 1 = urmarire, 2 = cautare stationara, 3 = pozitionare obiect}
 volatile int obiect_prezent_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
 volatile int unghiOrientare = 0;                    // unghiul de comanda al servo unde s-a depistat valoare maxima RSSI din intervalul de unghiuri in care s-au facut cautarile
 volatile int valoareRSSI = 0;                       // valoarea rssi masurata corespunzatoare unghiului de orientare
@@ -75,16 +84,16 @@ portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;   // mutex acces variabila
 unsigned long ultimaAfisare = 0;                    // variabila global de timp - afisare mesaje de debug - in conditii de test
 
 // instanta a structurii de date enum StareComportament
-StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT; 
+StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
 
 // handelere pentru controlul activarii taskurilor
-TaskHandle_t handleTaskDeplasare_Urmarire = NULL;
-TaskHandle_t handleTaskDeplasare_CautareStationara = NULL;
-TaskHandle_t handleTaskDeplasare_PozitionareObiect = NULL; 
+// TaskHandle_t handleTaskDeplasare_Urmarire = NULL;
+// TaskHandle_t handleTaskDeplasare_CautareStationara = NULL;
+// TaskHandle_t handleTaskDeplasare_PozitionareObiect = NULL; 
 TaskHandle_t handleTaskControl_servoAntena = NULL;
 TaskHandle_t handleTaskComportamentRobot = NULL;
 TaskHandle_t handleTaskCitireUART = NULL;
-
+TaskHandle_t handleTaskDeplasare = NULL;
 void setup() {
   // setare UART 0 in cazul debugging ului
   Serial.begin(115200);
@@ -167,70 +176,6 @@ void taskControl_servoAntena(void *parameter) {
   }
 }
 /**
- * @brief Task pentru deplasarea robotului în funcție de unghiul detectat de antenă.
- * 
- * Robotul se rotește sau avansează pentru a se alinia cu direcția sursei de semnal.
- */
-void taskControl_Deplasare_Urmarire(void *parameter) {
-  // control dupa unghiul de comanda al servomotorului anatenei
-  while (true) {
-    // protectie la citire
-    portENTER_CRITICAL(&muxUNGHI);
-    int unghiProvenienta_local = unghiOrientare;
-    portEXIT_CRITICAL(&muxUNGHI);
-
-    if (unghiProvenienta_local >= 80 && unghiProvenienta_local <= 100) {
-      motoare_deplasareFata();
-    } else if (unghiProvenienta_local < 80) {
-      motoare_rotireStanga();
-    } else if (unghiProvenienta_local > 100) {
-      motoare_rotireDreapta();
-    }
-    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
-  }
-}
-/**
- * @brief Task pentru efectuarea unei căutări staționare a stației prin rotație stânga-dreapta.
- * 
- * Folosit când semnalul este slab, robotul oscilează pentru a găsi o direcție mai bună.
- */
-void taskControl_Deplasare_CautareStationare(void *parameter) {
-  // comenzi repetate de stanga - dreapta
-  while (true) {
-    motoare_rotireDreapta();
-    vTaskDelay(500);
-    motoare_rotireStanga();
-    vTaskDelay(1000);
-    motoare_rotireDreapta();
-    vTaskDelay(500);
-    
-    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
-  }
-}
-/**
- * @brief Task pentru poziționarea robotului în dreptul obiectului detectat.
- * 
- * Inițiază secvențele de prindere cu brațul, retragerea din stație și actualizarea stării.
- */
-void taskControl_Deplasare_PozitionareObiect(void *parameter) {
-  // - determinarea pozitiei de prindere
-  // - activare brat_prindere()
-  // - activare motoare_executieRetragere()
-  // - schimbare stare - STARE_STATIA_B
-  while (true) {
-    portENTER_CRITICAL(&muxUART);
-    int obiect_detectat_local = ::obiect_detectat;
-    int obiect_x_local = ::obiect_x;
-    int obiect_y_local = ::obiect_y;
-    int obiect_w_local = ::obiect_w;
-    int obiect_h_local = ::obiect_h;
-    portEXIT_CRITICAL(&muxUART);
-
-
-    vTaskDelay(1); // pentru a permite task ului sa cedeze prioritatea altui task
-  }
-}
-/**
  * @brief Task pentru citirea datelor de la ESP-CAM prin UART.
  * 
  * Decodifică mesajele primite, determină dacă un obiect este detectat și salvează coordonatele.
@@ -282,6 +227,93 @@ void taskCitireUART(void *parameter){
   }
 }
 /**
+ * @brief Task pentru controlul deplasării robotului în funcție de unghiul de orientare.
+ * 
+ * Controlează motoarele pentru deplasare în față, rotire stânga/dreapta,
+ * sau alte manevre în funcție de unghiul de orientare al antenei.
+ */
+void taskControl_Deplasare(void *parameter) {
+  int tipDeplasare_local = 0;
+
+  while (true) {
+    portENTER_CRITICAL(&muxVarG);
+    tipDeplasare_local = ::tipDeplasare;
+    portEXIT_CRITICAL(&muxVarG);
+
+    switch (tipDeplasare_local) {
+      case 0:
+        // Logica pentru stationare
+        motoare_stop();
+        break;
+      case 1:
+        // Logica pentru urmarire
+        portENTER_CRITICAL(&muxUNGHI);
+        int unghiProvenienta_local = unghiOrientare;
+        portEXIT_CRITICAL(&muxUNGHI);
+
+        if (unghiProvenienta_local >= 80 && unghiProvenienta_local <= 100) {
+          motoare_deplasareFata();
+        } else if (unghiProvenienta_local < 80) {
+          motoare_rotireStanga();
+        } else if (unghiProvenienta_local > 100) {
+          motoare_rotireDreapta();
+        }
+        break;
+      case 2:
+        // Logica pentru cautare stationara
+        motoare_rotireDreapta();
+        vTaskDelay(500);
+        motoare_rotireStanga();
+        vTaskDelay(1000);
+        motoare_rotireDreapta();
+        vTaskDelay(500);
+        break;
+      case 3:
+        // Logica pentru pozitionare obiect
+        portENTER_CRITICAL(&muxUART);
+        int obiect_detectat_local = ::obiect_detectat;
+        int obiect_x_local = ::obiect_x;
+        int obiect_y_local = ::obiect_y;
+        int obiect_w_local = ::obiect_w;
+        int obiect_h_local = ::obiect_h;
+        portEXIT_CRITICAL(&muxUART);
+
+
+        break;
+      default:
+        motoare_stop();
+        break;
+    }
+    vTaskDelay(1);
+  }
+}
+/**
+ * @brief Activează sau suspendă task-urile de deplasare pe baza semnalului de control.
+ * 
+ */
+void control_taskDeplasare(enum TipDeplasare tipDeplasare) {
+  int tipDeplasare_local = 0;
+
+  switch (tipDeplasare) {
+    case DEPLASARE_URMARIRE:
+      tipDeplasare_local = 1;
+      break;
+    case DEPLASARE_CAUTARE_STATIONARA:
+      tipDeplasare_local = 2;
+      break;
+    case DEPLASARE_POZITIONARE_OBIECT:
+      tipDeplasare_local = 3;
+      break;
+    default:
+      tipDeplasare_local = 0;
+      break;
+
+    portENTER_CRITICAL(&muxVarG);
+    ::tipDeplasare = tipDeplasare_local; // actualizare stare deplasare
+    portEXIT_CRITICAL(&muxVarG);
+  }
+}
+/**
  * @brief Taskul principal de comportament al robotului – controlează starea sistemului.
  * 
  * În funcție de context (RSSI, detecția obiectului, prezența în zonă), comută între stări și activează task-uri.
@@ -290,6 +322,7 @@ void taskComportamentRobot(void *parameter) {
   while (true) {
     vTaskResume(handleTaskControl_servoAntena);
     vTaskResume(handleTaskCitireUART);
+    vTaskResume(handleTaskDeplasare);
 
     // actualizare variabile locale sincronizate
     portENTER_CRITICAL(&muxVarG);
@@ -337,9 +370,9 @@ void taskComportamentRobot(void *parameter) {
         break;
 
       case STARE_REPAUS:
+        // singurul repaus momentan din sistem are loc in rutina din zona C de asteptare
         break;
     }
-
     vTaskDelay(100);
   }
 }
@@ -387,16 +420,16 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
   if (isConnectedToStation(1)) {
     if (obiect_detectat == 1) {
       Serial.println("DEBUG - STARE_ZONA_A - Obiect detectat vizual. - Activare POZITIONARE.");
-      activeazaTaskuri_Deplasare(false, false, true);
-    } else if (RSSI > PROX_RSSI_MAX) {
+      control_taskDeplasare(DEPLASARE_POZITIONARE_OBIECT);
+    } else if (RSSI > PROX_RSSI_MAX) { // conditie in care se verifica daca s-a ajuns in zona de proximitate
       Serial.println("DEBUG - STARE_ZONA_A - RSSI puternic.          - Activare STATIONARA.");
-      activeazaTaskuri_Deplasare(false, true, false);
+      control_taskDeplasare(DEPLASARE_CAUTARE_STATIONARA);
     } else {
       Serial.println("DEBUG - STARE_ZONA_A - RSSI slab.              - Activare URMARIRE.");
-      activeazaTaskuri_Deplasare(true, false, false);
+      control_taskDeplasare(DEPLASARE_URMARIRE);
     }
   } else {
-    activeazaTaskuri_Deplasare(false, false, false);
+    control_taskDeplasare(DEPLASARE_STATIONARE);
     asteptareReconectare(1);
   }
 }
@@ -417,16 +450,17 @@ void handleStareZona_B(int RSSI) {
       Serial.println("DEBUG - STARE_ZONA_B - Executare eliberare.");
       brat_eliberare();
       motoare_executieRetragere();
-      digitalWrite(pinPWM, LOW);
+      control_taskDeplasare(DEPLASARE_STATIONARE);
+
       portENTER_CRITICAL(&muxVarG);
       stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
       portEXIT_CRITICAL(&muxVarG);
     } else {
       Serial.println("DEBUG - STARE_ZONA_B - RSSI slab.              - Activare URMARIRE.");
-      activeazaTaskuri_Deplasare(true, false, false);
+      control_taskDeplasare(DEPLASARE_URMARIRE);
     }
   } else {
-    activeazaTaskuri_Deplasare(false, false, false);
+    control_taskDeplasare(DEPLASARE_STATIONARE);
     asteptareReconectare(2);
   }
 }
@@ -450,8 +484,10 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
       portENTER_CRITICAL(&muxVarG);
       conectareStatie = 1;
       portEXIT_CRITICAL(&muxVarG);
-      activeazaTaskuri_Deplasare(false, false, false);
+
+      control_taskDeplasare(DEPLASARE_STATIONARE);
       asteptareReconectare(1);
+
       if (isConnectedToStation(1)) {
         int prezenta = 0;
         while (!prezenta) {
@@ -468,32 +504,16 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
       portENTER_CRITICAL(&muxVarG);
       ::stareComport_Robot = STARE_ZONA_A;
       portEXIT_CRITICAL(&muxVarG);
-      activeazaTaskuri_Deplasare(false, false, false);
+
+      control_taskDeplasare(DEPLASARE_STATIONARE);
     } else {
       Serial.println("DEBUG - STARE_ZONA_C - RSSI slab.              - Activare URMARIRE.");
-      activeazaTaskuri_Deplasare(true, false, false);
+      control_taskDeplasare(DEPLASARE_URMARIRE);
     }
   } else {
-    activeazaTaskuri_Deplasare(false, false, false);
+    control_taskDeplasare(DEPLASARE_STATIONARE);
     asteptareReconectare(3);
   }
-}
-/**
- * @brief Activează sau suspendă task-urile de deplasare pe baza semnalului de control.
- * 
- * @param urmarire Activează task-ul de urmărire
- * @param cautare Activează task-ul de căutare staționară
- * @param pozitionare Activează task-ul de poziționare obiect
- */
-void activeazaTaskuri_Deplasare(bool urmarire, bool cautare, bool pozitionare) {
-  if (urmarire) vTaskResume(handleTaskDeplasare_Urmarire);
-  else vTaskSuspend(handleTaskDeplasare_Urmarire);
-
-  if (cautare) vTaskResume(handleTaskDeplasare_CautareStationara);
-  else vTaskSuspend(handleTaskDeplasare_CautareStationara);
-
-  if (pozitionare) vTaskResume(handleTaskDeplasare_PozitionareObiect);
-  else vTaskSuspend(handleTaskDeplasare_PozitionareObiect);
 }
 /**
  * @brief Verifică dacă robotul este conectat la o anumită stație Wi-Fi.
@@ -511,8 +531,8 @@ bool isConnectedToStation(int stationIndex) {
  */
 void asteptareReconectare(int conectareStare_local){
   Serial.println("DEBUG - asteptareReconectare");
-  digitalWrite(pinPWM, LOW);
-  
+  control_taskDeplasare(DEPLASARE_STATIONARE);
+
   portENTER_CRITICAL(&muxVarG);
   ::conectareStatie = conectareStare_local;
   portEXIT_CRITICAL(&muxVarG); 
@@ -567,38 +587,49 @@ void initTaskuri(){
   );
   vTaskSuspend(handleTaskControl_servoAntena); // suspendare initiala a taskului de control al antenei
 
-  xTaskCreatePinnedToCore(
-    taskControl_Deplasare_Urmarire,
-    "taskControl_Deplasare_Urmarire",
-    4096,
-    NULL,
-    1,
-    &handleTaskDeplasare_Urmarire,
-    1               // core 1
-  );
-  vTaskSuspend(handleTaskDeplasare_Urmarire); // suspendare initiala a taskului de deplasare urmarire
+  // xTaskCreatePinnedToCore(
+  //   taskControl_Deplasare_Urmarire,
+  //   "taskControl_Deplasare_Urmarire",
+  //   4096,
+  //   NULL,
+  //   1,
+  //   &handleTaskDeplasare_Urmarire,
+  //   1               // core 1
+  // );
+  // vTaskSuspend(handleTaskDeplasare_Urmarire); // suspendare initiala a taskului de deplasare urmarire
 
-  xTaskCreatePinnedToCore(
-    taskControl_Deplasare_CautareStationare,
-    "taskControl_Deplasare_CautareStationare",
-    4096,
-    NULL,
-    1,
-    &handleTaskDeplasare_CautareStationara,
-    1               // core 1
-  );
-  vTaskSuspend(handleTaskDeplasare_CautareStationara); // suspendare initiala a taskului de deplasare cautare stationara
+  // xTaskCreatePinnedToCore(
+  //   taskControl_Deplasare_CautareStationare,
+  //   "taskControl_Deplasare_CautareStationare",
+  //   4096,
+  //   NULL,
+  //   1,
+  //   &handleTaskDeplasare_CautareStationara,
+  //   1               // core 1
+  // );
+  // vTaskSuspend(handleTaskDeplasare_CautareStationara); // suspendare initiala a taskului de deplasare cautare stationara
 
-  xTaskCreatePinnedToCore(
-    taskControl_Deplasare_PozitionareObiect,
-    "taskControl_Deplasare_PozitionareObiect",
+  // xTaskCreatePinnedToCore(
+  //   taskControl_Deplasare_PozitionareObiect,
+  //   "taskControl_Deplasare_PozitionareObiect",
+  //   4096,
+  //   NULL,
+  //   1,
+  //   &handleTaskDeplasare_PozitionareObiect,
+  //   1               // core 1
+  // );
+  // vTaskSuspend(handleTaskDeplasare_PozitionareObiect); // suspendare initiala a taskului de deplasare pozitionare obiect
+
+    xTaskCreatePinnedToCore(
+    taskControl_Deplasare,
+    "taskControl_Deplasare",
     4096,
     NULL,
     1,
-    &handleTaskDeplasare_PozitionareObiect,
+    &handleTaskDeplasare,
     1               // core 1
   );
-  vTaskSuspend(handleTaskDeplasare_PozitionareObiect); // suspendare initiala a taskului de deplasare pozitionare obiect
+  vTaskSuspend(handleTaskDeplasare); // suspendare initiala a taskului de deplasare
 
   xTaskCreatePinnedToCore(
     taskCitireUART,
