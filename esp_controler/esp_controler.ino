@@ -254,9 +254,9 @@ void taskControl_Deplasare(void *parameter) {
         if (unghiProvenienta_local >= 80 && unghiProvenienta_local <= 100) {
           motoare_deplasareFata();
         } else if (unghiProvenienta_local < 80) {
-          motoare_rotireStanga();
-        } else if (unghiProvenienta_local > 100) {
           motoare_rotireDreapta();
+        } else if (unghiProvenienta_local > 100) {
+          motoare_rotireStanga();
         }
         break;
       case 2:
