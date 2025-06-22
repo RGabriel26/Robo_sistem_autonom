@@ -63,12 +63,11 @@ enum TipDeplasare{              // enum folosit pentru controlul deplasarii robo
   DEPLASARE_URMARIRE, 
   DEPLASARE_CAUTARE_STATIONARA, 
   DEPLASARE_POZITIONARE_OBIECT,
-  DEPLASARE_STATIONARE
+  DEPLASARE_STOP
 };
 
 volatile int interval[2] = {LIM_INF , LIM_SUP};     // interval cu unghiurile pe care le va explora antena
 volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
-volatile int tipDeplasare = 0;                       // folosit pentru controlul deplasarii in task ul destinat {tipDeplasare -> 0 = stationare, 1 = urmarire, 2 = cautare stationara, 3 = pozitionare obiect}
 volatile int obiect_prezent_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
 volatile int unghiOrientare = 0;                    // unghiul de comanda al servo unde s-a depistat valoare maxima RSSI din intervalul de unghiuri in care s-au facut cautarile
 volatile int valoareRSSI = 0;                       // valoarea rssi masurata corespunzatoare unghiului de orientare
@@ -85,6 +84,8 @@ unsigned long ultimaAfisare = 0;                    // variabila global de timp 
 
 // instanta a structurii de date enum StareComportament
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
+// instanta a structurii de date enum TipDeplasare
+TipDeplasare tipDeplasare_Robot = DEPLASARE_STOP;
 
 // handelere pentru controlul activarii taskurilor
 // TaskHandle_t handleTaskDeplasare_Urmarire = NULL;
@@ -233,19 +234,17 @@ void taskCitireUART(void *parameter){
  * sau alte manevre în funcție de unghiul de orientare al antenei.
  */
 void taskControl_Deplasare(void *parameter) {
-  int tipDeplasare_local = 0;
-
   while (true) {
     portENTER_CRITICAL(&muxVarG);
-    tipDeplasare_local = ::tipDeplasare;
+    TipDeplasare tipDeplasare_Robot_local = ::tipDeplasare_Robot; // actualizare tip deplasare
     portEXIT_CRITICAL(&muxVarG);
-
-    switch (tipDeplasare_local) {
-      case 0:
+    switch (tipDeplasare_Robot_local) {
+      case DEPLASARE_STOP:{
         // Logica pentru stationare
         motoare_stop();
         break;
-      case 1:
+      }
+      case DEPLASARE_URMARIRE:{
         // Logica pentru urmarire
         portENTER_CRITICAL(&muxUNGHI);
         int unghiProvenienta_local = unghiOrientare;
@@ -259,7 +258,8 @@ void taskControl_Deplasare(void *parameter) {
           motoare_rotireStanga();
         }
         break;
-      case 2:
+      }
+      case DEPLASARE_CAUTARE_STATIONARA:{
         // Logica pentru cautare stationara
         motoare_rotireDreapta();
         vTaskDelay(500);
@@ -268,7 +268,8 @@ void taskControl_Deplasare(void *parameter) {
         motoare_rotireDreapta();
         vTaskDelay(500);
         break;
-      case 3:
+      }
+      case DEPLASARE_POZITIONARE_OBIECT:{
         // Logica pentru pozitionare obiect
         portENTER_CRITICAL(&muxUART);
         int obiect_detectat_local = ::obiect_detectat;
@@ -280,6 +281,7 @@ void taskControl_Deplasare(void *parameter) {
 
 
         break;
+      }
       default:
         motoare_stop();
         break;
@@ -288,30 +290,25 @@ void taskControl_Deplasare(void *parameter) {
   }
 }
 /**
- * @brief Activează sau suspendă task-urile de deplasare pe baza semnalului de control.
+ * @brief Controlează tipul de deplasare al robotului.
+ * @param tipDeplasare Tipul de deplasare dorit (enum TipDeplasare).
  * 
  */
 void control_taskDeplasare(enum TipDeplasare tipDeplasare) {
-  int tipDeplasare_local = 0;
+  portENTER_CRITICAL(&muxVarG);
+  ::tipDeplasare_Robot = tipDeplasare; // actualizare tip deplasare
+  portEXIT_CRITICAL(&muxVarG);
+}
 
-  switch (tipDeplasare) {
-    case DEPLASARE_URMARIRE:
-      tipDeplasare_local = 1;
-      break;
-    case DEPLASARE_CAUTARE_STATIONARA:
-      tipDeplasare_local = 2;
-      break;
-    case DEPLASARE_POZITIONARE_OBIECT:
-      tipDeplasare_local = 3;
-      break;
-    default:
-      tipDeplasare_local = 0;
-      break;
-
-    portENTER_CRITICAL(&muxVarG);
-    ::tipDeplasare = tipDeplasare_local; // actualizare stare deplasare
-    portEXIT_CRITICAL(&muxVarG);
-  }
+/**
+ * @brief Controlează starea comportamentală a robotului.
+ * 
+ * @param stareComport Starea comportamentului dorită.
+ */
+void control_stareComportamentRobot(enum StareComportament stareComport) {
+  portENTER_CRITICAL(&muxVarG);
+  ::stareComport_Robot = stareComport; // actualizare stare comportament
+  portEXIT_CRITICAL(&muxVarG);
 }
 /**
  * @brief Taskul principal de comportament al robotului – controlează starea sistemului.
@@ -392,14 +389,10 @@ void handleStare_Verificare(int obiect_prezent) {
     vTaskDelay(3000);
     if (obiect_prezent) {
       Serial.println("DEBUG - STARE_VERIFICARE - Obiect prezent. Trecere la STARE_ZONA_A.");
-      portENTER_CRITICAL(&muxVarG);
-      stareComport_Robot = STARE_ZONA_A;
-      portEXIT_CRITICAL(&muxVarG);
+      control_stareComportamentRobot(STARE_ZONA_A);
     } else {
       Serial.println("DEBUG - STARE_VERIFICARE - Obiect absent. Trecere la STARE_ZONA_C.");
-      portENTER_CRITICAL(&muxVarG);
-      stareComport_Robot = STARE_ZONA_C;
-      portEXIT_CRITICAL(&muxVarG);
+      control_stareComportamentRobot(STARE_ZONA_C);
     }
   } else {
     asteptareReconectare(1);
@@ -429,7 +422,7 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
       control_taskDeplasare(DEPLASARE_URMARIRE);
     }
   } else {
-    control_taskDeplasare(DEPLASARE_STATIONARE);
+    control_taskDeplasare(DEPLASARE_STOP);
     asteptareReconectare(1);
   }
 }
@@ -450,17 +443,15 @@ void handleStareZona_B(int RSSI) {
       Serial.println("DEBUG - STARE_ZONA_B - Executare eliberare.");
       brat_eliberare();
       motoare_executieRetragere();
-      control_taskDeplasare(DEPLASARE_STATIONARE);
+      control_taskDeplasare(DEPLASARE_STOP);
 
-      portENTER_CRITICAL(&muxVarG);
-      stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
-      portEXIT_CRITICAL(&muxVarG);
+      control_stareComportamentRobot(STARE_VERIFICARE_PREZENTA_OBIECT);
     } else {
       Serial.println("DEBUG - STARE_ZONA_B - RSSI slab.              - Activare URMARIRE.");
       control_taskDeplasare(DEPLASARE_URMARIRE);
     }
   } else {
-    control_taskDeplasare(DEPLASARE_STATIONARE);
+    control_taskDeplasare(DEPLASARE_STOP);
     asteptareReconectare(2);
   }
 }
@@ -485,7 +476,7 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
       conectareStatie = 1;
       portEXIT_CRITICAL(&muxVarG);
 
-      control_taskDeplasare(DEPLASARE_STATIONARE);
+      control_taskDeplasare(DEPLASARE_STOP);
       asteptareReconectare(1);
 
       if (isConnectedToStation(1)) {
@@ -501,17 +492,14 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
         Serial.println("DEBUG - STARE_ZONA_C - CONECTARE ZONA_A - ESUATA");
       }
       Serial.println("DEBUG - STARE_ZONA_C - Obiect prezent in zona A. Trecere la STARE_ZONA_A.");
-      portENTER_CRITICAL(&muxVarG);
-      ::stareComport_Robot = STARE_ZONA_A;
-      portEXIT_CRITICAL(&muxVarG);
-
-      control_taskDeplasare(DEPLASARE_STATIONARE);
+      control_stareComportamentRobot(STARE_ZONA_A);
+      control_taskDeplasare(DEPLASARE_STOP);
     } else {
       Serial.println("DEBUG - STARE_ZONA_C - RSSI slab.              - Activare URMARIRE.");
       control_taskDeplasare(DEPLASARE_URMARIRE);
     }
   } else {
-    control_taskDeplasare(DEPLASARE_STATIONARE);
+    control_taskDeplasare(DEPLASARE_STOP);
     asteptareReconectare(3);
   }
 }
@@ -531,7 +519,7 @@ bool isConnectedToStation(int stationIndex) {
  */
 void asteptareReconectare(int conectareStare_local){
   Serial.println("DEBUG - asteptareReconectare");
-  control_taskDeplasare(DEPLASARE_STATIONARE);
+  control_taskDeplasare(DEPLASARE_STOP);
 
   portENTER_CRITICAL(&muxVarG);
   ::conectareStatie = conectareStare_local;
