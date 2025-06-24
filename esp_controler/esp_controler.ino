@@ -35,7 +35,7 @@ brat_control.h:
 */
 
 // date de conectare pentru statii
-const char* ssid_statie[] = {"", "Statia_A", "Statia_B", "Statia_C"};     // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
+const char* ssid_statie[] = {"", "Zona_A", "Zona_B", "Zona_C"};     // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
 const char* password_statie[] = {"", "12345678", "12345678", "12345678"}; 
 
 // instante servo
@@ -136,7 +136,7 @@ void taskControl_servoAntena(void *parameter) {
       vTaskResume(handleTaskComportamentRobot);
     } else {
       // posibila necesitatea unei verificari suplimentare statiei actual conectate
-      if(WiFi.SSID() == ssid_statie[1]){ // verificare conectiune statia A
+      if(WiFi.SSID() == ssid_statie[1]){ // verificare conectiune Zona_A
         int packetSize = udpReceiver.parsePacket();
         if (packetSize) {
           char incomingPacket[255];
@@ -279,9 +279,30 @@ void taskControl_Deplasare(void *parameter) {
         int obiect_h_local = ::obiect_h;
         portEXIT_CRITICAL(&muxUART);
 
-
+        // logica de pozitionarea robotului pe traiectoria obiectului
+        if (obiect_detectat_local) {
+          Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect detectat, pozitionare robot...");
+          // logica de deplasare in fata
+          if (obiect_x_local < 30) { // obiectul este in stanga
+            motoare_lateralStanga();
+          } else if (obiect_x_local > 55) { // obiectul este in dreapta
+            motoare_lateralDreapta();
+          } else { // obiectul este in fata
+            motoare_deplasareFata();
+            if(obiect_y_local > 60){
+              Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
+              vTaskDelay(1500);
+              motoare_stop();
+              brat_prindere(); // executie prindere
+              Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Prindere executata, executare retragere...");
+              motoare_executieRetragere(); // executie retragere
+            }
+          }
+          // schimbare stare comportament
+          control_stareComportamentRobot(STARE_ZONA_B);
         break;
-      }
+        }
+      } 
       default:
         motoare_stop();
         break;

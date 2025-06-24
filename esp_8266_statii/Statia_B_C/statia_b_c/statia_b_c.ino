@@ -9,17 +9,26 @@
 //#include <WiFi.h>
 
 // Acces Point credentiale // 
-const char* ssid = "Statia_B";
-const char* password = "12345678";
-// const char* ssid = "Statia_C";
+// const char* ssid = "Zona_B";
 // const char* password = "12345678";
+const char* ssid = "Zona_C";
+const char* password = "12345678";
+
+// Pini pentru LED de stare
+#define PIN_HIGH D1
+#define PIN_LOW  D2
 
 void setup() {
   Serial.begin(115200);
   // Configurează ESP32 ca Access Point
   WiFi.softAP(ssid, password);
+
+  // Configurează pini pentru LED de stare
+  pinMode(PIN_HIGH, OUTPUT);
+  pinMode(PIN_LOW, OUTPUT);
+  digitalWrite(PIN_HIGH, HIGH); // Setează PIN_HIGH la HIGH
+  digitalWrite(PIN_LOW, LOW);   // Setează PIN_LOW la LOW
 }
 
 void loop() {
-  // Statiile doar furnizeaza o retea wifi
 }

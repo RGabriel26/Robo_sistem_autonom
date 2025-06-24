@@ -8,7 +8,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
 
-const char* ssid = "Statia_A";
+const char* ssid = "Zona_A";
 const char* password = "12345678";
 
 WiFiUDP udp;
@@ -17,6 +17,10 @@ const unsigned int receiverPort = 4210;
 
 #define PIN_TRANSMIT D6 // IR LED
 #define PIN_RECEIVE  D5 // IR Receiver
+
+// Pini pentru LED de stare
+#define PIN_HIGH D1
+#define PIN_LOW  D2
 
 bool irActive = false;
 unsigned long lastToggle = 0;
@@ -31,6 +35,12 @@ void setup() {
 
   pinMode(PIN_RECEIVE, INPUT);
   pinMode(PIN_TRANSMIT, OUTPUT);
+
+  // pini pentru ledul de stare
+  pinMode(PIN_HIGH, OUTPUT);
+  pinMode(PIN_LOW, OUTPUT);
+  digitalWrite(PIN_HIGH, HIGH); // Setează PIN_HIGH la HIGH
+  digitalWrite(PIN_LOW, LOW);   // Setează PIN_LOW la LOW
 
   analogWriteFreq(38000);
   analogWrite(PIN_TRANSMIT, 128); // pornit la start

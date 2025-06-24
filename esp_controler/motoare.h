@@ -95,7 +95,7 @@ void motoare_rotireDreapta() {
  * 
  * Activează toate motoarele pentru a realiza o mișcare laterală stânga.
  */
-void motoare_verticalStanga() {
+void motoare_lateralStanga() {
   digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
@@ -112,7 +112,7 @@ void motoare_verticalStanga() {
  * 
  * Activează toate motoarele pentru a realiza o mișcare laterală dreapta.
  */
-void motoare_verticalDreapta() {
+void motoare_lateralDreapta() {
   digitalWrite(pinPWM, HIGH);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
