@@ -48,7 +48,7 @@ WiFiUDP udpReceiver;
 const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul UDP cu statia A
  
 // parametrii
-#define PROX_RSSI_MAX -45            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
+#define PROX_RSSI_MAX -50            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
 
 // variabile globale
 enum StareComportament{             // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental

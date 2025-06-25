@@ -134,8 +134,8 @@ int det_unghi_orientare(int &rssi_max_out) {
             }
 
             if (rssi > max_rssi) {
-                max_rssi = rssi;
-                unghi_max_rssi = unghi;
+                max_rssi = rssi;          // actualizare valoare maxima rssi  
+                unghi_max_rssi = unghi;   // actualizare unghi cu valoarea maxim rssi
             }
         }
 
