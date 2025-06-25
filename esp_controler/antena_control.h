@@ -16,7 +16,8 @@
 // ========================
 
 #define DELAY_UNGHI 50       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
-#define PAS_UNGHI 10         ///< Incrementul unghiului de scanare
+#define PAS_UNGHI 20         ///< Incrementul unghiului de scanare
+
 #define LIM_INF 20           ///< Limită inferioară pentru unghiul de scanare
 #define LIM_SUP 160          ///< Limită superioară pentru unghiul de scanare
 
@@ -26,9 +27,6 @@
 
 /// Lista SSID-urilor disponibile pentru stații (definită în .ino)
 extern const char* ssid_statie[];
-
-/// Intervalul curent de unghiuri de scanare (modificabil dinamic)
-extern volatile int interval[2];
 
 /// Instanță globală a servomotorului antenei
 extern Servo servoAntena;
@@ -42,6 +40,11 @@ extern const unsigned int localPort;
 /// Indexul curent al stației la care se face conectarea (0 = dezactivat)
 extern volatile int conectareStatie;
 
+// ========================
+// VARIABILE INTERNE
+// ========================
+static int interval[2] = {LIM_INF, LIM_SUP}; ///< Intervalul de scanare a unghiului pentru RSSI
+
 /**
  * @brief Se conectează la o rețea Wi-Fi specificată.
  * 
@@ -52,18 +55,19 @@ extern volatile int conectareStatie;
  * @param password Parola rețelei
  */
 void connect_statie(const char* ssid, const char* password) {
-    digitalWrite(pinPWM, LOW);
+    dacWrite(pinPWM, 0);
     WiFi.disconnect();
     udpReceiver.stop();
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
+    Serial.print("\nDEBUG - connect_statie - Asteptare pentru conexiunea la SSID: "); Serial.println(ssid);
     while (WiFi.status() != WL_CONNECTED) {
         vTaskDelay(500);
         Serial.print(".");
     }
     if (WiFi.SSID() == ssid_statie[1]) udpReceiver.begin(localPort);
     Serial.println("");
-    Serial.print("WiFi connected ");
+    Serial.print("WiFi conectat la: ");
     Serial.println(ssid);
 }
 
@@ -76,21 +80,21 @@ void connect_statie(const char* ssid, const char* password) {
  * @param unghi_max_rssi Unghiul unde s-a găsit semnalul maxim
  * @param val_restrangere Valoarea cu care se restrânge din fiecare parte
  */
-void trunchiere_interval(int unghi_max_rssi, int val_restrangere) {
-    if (unghi_max_rssi == interval[0] || unghi_max_rssi == interval[1]) {
-        int nou_lim_inf = unghi_max_rssi - (val_restrangere + 20);
-        interval[0] = (nou_lim_inf <= LIM_INF) ? LIM_INF : nou_lim_inf;
+// void trunchiere_interval(int unghi_max_rssi, int val_restrangere) {
+//     if (unghi_max_rssi == interval[0] || unghi_max_rssi == interval[1]) {
+//         int nou_lim_inf = unghi_max_rssi - (val_restrangere + 20);
+//         interval[0] = (nou_lim_inf <= LIM_INF) ? LIM_INF : nou_lim_inf;
 
-        int nou_lim_sup = unghi_max_rssi + (val_restrangere + 20);
-        interval[1] = (nou_lim_sup >= LIM_SUP) ? LIM_SUP : nou_lim_sup;
-    } else {
-        int nou_lim_inf = unghi_max_rssi - val_restrangere;
-        interval[0] = (nou_lim_inf <= LIM_INF) ? LIM_INF : nou_lim_inf;
+//         int nou_lim_sup = unghi_max_rssi + (val_restrangere + 20);
+//         interval[1] = (nou_lim_sup >= LIM_SUP) ? LIM_SUP : nou_lim_sup;
+//     } else {
+//         int nou_lim_inf = unghi_max_rssi - val_restrangere;
+//         interval[0] = (nou_lim_inf <= LIM_INF) ? LIM_INF : nou_lim_inf;
 
-        int nou_lim_sup = unghi_max_rssi + val_restrangere;
-        interval[1] = (nou_lim_sup >= LIM_SUP) ? LIM_SUP : nou_lim_sup;
-    }
-}
+//         int nou_lim_sup = unghi_max_rssi + val_restrangere;
+//         interval[1] = (nou_lim_sup >= LIM_SUP) ? LIM_SUP : nou_lim_sup;
+//     }
+// }
 
 /**
  * @brief Determină unghiul de orientare cu cel mai bun semnal Wi-Fi.
@@ -105,16 +109,12 @@ void trunchiere_interval(int unghi_max_rssi, int val_restrangere) {
 int det_unghi_orientare(int &rssi_max_out) {
         int unghi_max_rssi = 0;
         int max_rssi = -200;
+        int rssi = 0;
 
         for (int unghi = interval[0]; unghi <= interval[1]; unghi += PAS_UNGHI) {
             servoAntena.write(unghi);
             vTaskDelay(DELAY_UNGHI);
-            int rssi = 0;
-            for (int i = 0; i < 5; i++) {
-                rssi += WiFi.RSSI();
-                vTaskDelay(5);
-            }
-            rssi /= 5;
+            rssi = WiFi.RSSI();
 
             if (rssi > max_rssi) {
                 max_rssi = rssi;
@@ -122,16 +122,13 @@ int det_unghi_orientare(int &rssi_max_out) {
             }
         }
 
-        trunchiere_interval(unghi_max_rssi, 20);
+        //trunchiere_interval(unghi_max_rssi, 20);
+        rssi = 0;
 
         for (int unghi = interval[1]; unghi >= interval[0]; unghi -= PAS_UNGHI) {
             servoAntena.write(unghi);
             vTaskDelay(DELAY_UNGHI);
-            int rssi = 0;
-            for (int i = 0; i < 5; i++) {
-                rssi += WiFi.RSSI();
-                vTaskDelay(5);
-            }
+            rssi = WiFi.RSSI();
 
             if (rssi > max_rssi) {
                 max_rssi = rssi;          // actualizare valoare maxima rssi  
@@ -139,7 +136,7 @@ int det_unghi_orientare(int &rssi_max_out) {
             }
         }
 
-        trunchiere_interval(unghi_max_rssi, 20);
+        // trunchiere_interval(unghi_max_rssi, 20);
         rssi_max_out = max_rssi; // valoarea transmisa prin referinta
 
         return unghi_max_rssi;

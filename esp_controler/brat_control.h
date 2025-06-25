@@ -8,7 +8,7 @@
 // ========================
 
 #define pinServoBase 23  ///< Pin pentru servo de la bază (ridicare/coborâre)
-#define pinServoHead 19  ///< Pin pentru servo de la efector (apucare/eliberare)
+#define pinServoHead 16  ///< Pin pentru servo de la efector (apucare/eliberare)
 
 // ========================
 // POZIȚII ȘI TIMPI

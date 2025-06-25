@@ -17,10 +17,12 @@
 #define DRIVER_B_IN1 32
 #define DRIVER_B_IN2 33
 #define DRIVER_B_IN3 25
-#define DRIVER_B_IN4 26
+#define DRIVER_B_IN4 19
 
 // pin pentru control PWM general
-#define pinPWM 16
+#define pinPWM 26
+
+extern const int pwmMaxVal;
 
 /**
  * @brief Deplasare înainte a robotului.
@@ -28,7 +30,7 @@
  * Setează pinii driverelor pentru a roti toate roțile în direcția înainte.
  */
 void motoare_deplasareFata() {
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -45,7 +47,7 @@ void motoare_deplasareFata() {
  * Inversează sensul de rotație al roților pentru mers înapoi.
  */
 void motoare_deplasareSpate() {
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -62,7 +64,7 @@ void motoare_deplasareSpate() {
  * Controlează motoarele pentru a executa o întoarcere pe loc spre stânga.
  */
 void motoare_rotireStanga() {
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -79,7 +81,7 @@ void motoare_rotireStanga() {
  * Controlează motoarele pentru a executa o întoarcere pe loc spre dreapta.
  */
 void motoare_rotireDreapta() {
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -96,7 +98,7 @@ void motoare_rotireDreapta() {
  * Activează toate motoarele pentru a realiza o mișcare laterală stânga.
  */
 void motoare_lateralStanga() {
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -113,7 +115,7 @@ void motoare_lateralStanga() {
  * Activează toate motoarele pentru a realiza o mișcare laterală dreapta.
  */
 void motoare_lateralDreapta() {
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -130,7 +132,7 @@ void motoare_lateralDreapta() {
  * Setează toți pinii de control în LOW pentru a opri motorul.
  */
 void motoare_stop() {
-  digitalWrite(pinPWM, LOW);
+  analogWrite(pinPWM, 0);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -147,7 +149,7 @@ void motoare_stop() {
  * Include mers înapoi și rotație pentru a ieși din stație. Se folosește `vTaskDelay` din FreeRTOS.
  */
 void motoare_executieRetragere(){
-  digitalWrite(pinPWM, HIGH);
+  analogWrite(pinPWM, pwmMaxVal);
   motoare_deplasareSpate();
   vTaskDelay(500);
   motoare_rotireDreapta();
