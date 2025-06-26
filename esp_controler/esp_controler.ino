@@ -51,6 +51,7 @@ const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul 
  
 // parametrii
 #define PROX_RSSI_MAX -50            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
+const int pwmMaxVal = 150;
 
 // variabile globale
 enum StareComportament{             // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
@@ -82,8 +83,6 @@ portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabila
 portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabile globale
 portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;   // mutex acces variabila unghi de orientare al antenei
 unsigned long ultimaAfisare = 0;                    // variabila global de timp - afisare mesaje de debug - in conditii de test
-
-const int pwmMaxVal = 150;
 
 // instanta a structurii de date enum 
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
@@ -363,7 +362,8 @@ void taskComportamentRobot(void *parameter) {
     Serial.print("OBIECT DETECTAT: "); Serial.println(obiect_detectat_local);
     Serial.print("OBIECT DETECTAT - COORDINATE: "); Serial.print(obiect_x_local); Serial.print(", "); Serial.print(obiect_y_local); Serial.print(", "); Serial.print(obiect_w_local); Serial.print(", "); Serial.println(obiect_h_local);
     Serial.println("=============================");
-    // executie comportament pe baza starii
+
+    // executie comportament pe baza de stari
     switch (stareComport_Robot) {
       case STARE_VERIFICARE_PREZENTA_OBIECT:
         handleStare_Verificare(obiect_prezent_local);
@@ -382,7 +382,6 @@ void taskComportamentRobot(void *parameter) {
         break;
 
       case STARE_REPAUS:
-        // singurul repaus momentan din sistem are loc in rutina din zona C de asteptare
         break;
     }
     vTaskDelay(100);
@@ -431,6 +430,8 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
     if (obiect_detectat == 1) {
       Serial.println("DEBUG - STARE_ZONA_A - Obiect detectat vizual. - Activare POZITIONARE.");
       control_taskDeplasare(DEPLASARE_POZITIONARE_OBIECT);
+      // dupa detectarea si pozitionarea obiectului, se trece la STARE_ZONA_B
+      // comportament tratat in taskControl_Deplasare dupa ce obiectul este prins
     } else if (RSSI > PROX_RSSI_MAX) { // conditie in care se verifica daca s-a ajuns in zona de proximitate
       Serial.println("DEBUG - STARE_ZONA_A - RSSI puternic.          - Activare STATIONARA.");
       control_taskDeplasare(DEPLASARE_CAUTARE_STATIONARA);
@@ -563,12 +564,14 @@ bool isConnectedToStation(int stationIndex) {
 void asteptareReconectare(int conectareStare_local){
   Serial.println("DEBUG - asteptareReconectare");
   control_taskDeplasare(DEPLASARE_STOP);
+  WiFi.disconnect(true); // deconectare de la retea
 
   portENTER_CRITICAL(&muxVarG);
   ::conectareStatie = conectareStare_local;
   portEXIT_CRITICAL(&muxVarG); 
 
   servoAntena.write(90);
+
 
   vTaskSuspend(handleTaskComportamentRobot);
   vTaskDelay(1);
