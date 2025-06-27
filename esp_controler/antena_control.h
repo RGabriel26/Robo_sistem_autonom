@@ -70,32 +70,6 @@ void connect_statie(const char* ssid, const char* password) {
     Serial.print("WiFi conectat la: ");
     Serial.println(ssid);
 }
-
-/**
- * @brief Trunchiază intervalul de căutare a semnalului RSSI în jurul unghiului maxim.
- * 
- * Această funcție este utilizată intern pentru a restrânge dinamic intervalul
- * în care se face căutarea unghiului optim.
- * 
- * @param unghi_max_rssi Unghiul unde s-a găsit semnalul maxim
- * @param val_restrangere Valoarea cu care se restrânge din fiecare parte
- */
-// void trunchiere_interval(int unghi_max_rssi, int val_restrangere) {
-//     if (unghi_max_rssi == interval[0] || unghi_max_rssi == interval[1]) {
-//         int nou_lim_inf = unghi_max_rssi - (val_restrangere + 20);
-//         interval[0] = (nou_lim_inf <= LIM_INF) ? LIM_INF : nou_lim_inf;
-
-//         int nou_lim_sup = unghi_max_rssi + (val_restrangere + 20);
-//         interval[1] = (nou_lim_sup >= LIM_SUP) ? LIM_SUP : nou_lim_sup;
-//     } else {
-//         int nou_lim_inf = unghi_max_rssi - val_restrangere;
-//         interval[0] = (nou_lim_inf <= LIM_INF) ? LIM_INF : nou_lim_inf;
-
-//         int nou_lim_sup = unghi_max_rssi + val_restrangere;
-//         interval[1] = (nou_lim_sup >= LIM_SUP) ? LIM_SUP : nou_lim_sup;
-//     }
-// }
-
 /**
  * @brief Determină unghiul de orientare cu cel mai bun semnal Wi-Fi.
  * 
@@ -121,8 +95,6 @@ int det_unghi_orientare(int &rssi_max_out) {
                 unghi_max_rssi = unghi;
             }
         }
-
-        //trunchiere_interval(unghi_max_rssi, 20);
         rssi = 0;
 
         for (int unghi = interval[1]; unghi >= interval[0]; unghi -= PAS_UNGHI) {
@@ -135,10 +107,7 @@ int det_unghi_orientare(int &rssi_max_out) {
                 unghi_max_rssi = unghi;   // actualizare unghi cu valoarea maxim rssi
             }
         }
-
-        // trunchiere_interval(unghi_max_rssi, 20);
         rssi_max_out = max_rssi; // valoarea transmisa prin referinta
-
         return unghi_max_rssi;
 }
 

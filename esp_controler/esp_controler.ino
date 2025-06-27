@@ -50,8 +50,8 @@ WiFiUDP udpReceiver;
 const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul UDP cu statia A
  
 // parametrii
-#define PROX_RSSI_MAX -50            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
-const int pwmMaxVal = 150;
+#define PROX_RSSI_MAX -45            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
+const int pwmMaxVal = 130;
 
 // variabile globale
 enum StareComportament{             // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
@@ -249,13 +249,13 @@ void taskControl_Deplasare(void *parameter) {
       case DEPLASARE_URMARIRE:{
         // Logica pentru urmarire
         portENTER_CRITICAL(&muxUNGHI);
-        int unghiProvenienta_local = unghiOrientare;
+        int unghiProvenienta_local = ::unghiOrientare;
         portEXIT_CRITICAL(&muxUNGHI);
 
-        if (unghiProvenienta_local < 80) { // obiectul este in stanga
+        if (unghiProvenienta_local < 70) { // obiectul este in stanga
           motoare_rotireStanga();
           vTaskDelay(500);
-        } else if (unghiProvenienta_local > 100) { // obiectul este in dreapta
+        } else if (unghiProvenienta_local > 110) { // obiectul este in dreapta
           motoare_rotireDreapta();
           vTaskDelay(500);
         } else { // obiectul este in fata
@@ -341,6 +341,7 @@ void taskComportamentRobot(void *parameter) {
 
     portENTER_CRITICAL(&muxRSSI);
     int rssi_local = ::valoareRSSI;
+    int unghiProvenienta_local = ::unghiOrientare;
     portEXIT_CRITICAL(&muxRSSI);
 
     portENTER_CRITICAL(&muxUART);
@@ -358,9 +359,10 @@ void taskComportamentRobot(void *parameter) {
     Serial.print("SSID: "); Serial.println(WiFi.SSID());
     Serial.print("STARE: "); Serial.println(stareComport_Robot);
     Serial.print("RSSI: "); Serial.println(rssi_local);
+    Serial.print("UNGHI: "); Serial.println(unghiProvenienta_local);
     Serial.print("OBIECT PREZENT: "); Serial.println(obiect_prezent_local);
     Serial.print("OBIECT DETECTAT: "); Serial.println(obiect_detectat_local);
-    Serial.print("OBIECT DETECTAT - COORDINATE: "); Serial.print(obiect_x_local); Serial.print(", "); Serial.print(obiect_y_local); Serial.print(", "); Serial.print(obiect_w_local); Serial.print(", "); Serial.println(obiect_h_local);
+    Serial.print("OBIECT DETECTAT - COORDONATE: "); Serial.print(obiect_x_local); Serial.print(", "); Serial.print(obiect_y_local); Serial.print(", "); Serial.print(obiect_w_local); Serial.print(", "); Serial.println(obiect_h_local);
     Serial.println("=============================");
 
     // executie comportament pe baza de stari
@@ -564,7 +566,7 @@ bool isConnectedToStation(int stationIndex) {
 void asteptareReconectare(int conectareStare_local){
   Serial.println("DEBUG - asteptareReconectare");
   control_taskDeplasare(DEPLASARE_STOP);
-  WiFi.disconnect(true); // deconectare de la retea
+  //WiFi.disconnect(true); // deconectare de la retea
 
   portENTER_CRITICAL(&muxVarG);
   ::conectareStatie = conectareStare_local;

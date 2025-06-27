@@ -12,8 +12,8 @@
 // If you set HOSTNAME and your router supports mDNS, you can access
 // the camera at http://{HOSTNAME}.local
 
-#define WIFI_SSID "unknown"
-#define WIFI_PASS "Camera335"
+#define WIFI_SSID "Gabriel"
+#define WIFI_PASS "gabi2602"
 #define HOSTNAME "esp32cam"
 
 
