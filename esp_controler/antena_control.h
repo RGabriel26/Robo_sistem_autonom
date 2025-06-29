@@ -15,8 +15,8 @@
 // SETĂRI FUNCȚIONARE
 // ========================
 
-#define DELAY_UNGHI 50       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
-#define PAS_UNGHI 20         ///< Incrementul unghiului de scanare
+#define DELAY_UNGHI 100       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
+#define PAS_UNGHI 30         ///< Incrementul unghiului de scanare
 
 #define LIM_INF 20           ///< Limită inferioară pentru unghiul de scanare
 #define LIM_SUP 160          ///< Limită superioară pentru unghiul de scanare
@@ -80,9 +80,10 @@ void connect_statie(const char* ssid, const char* password) {
  * @param[out] rssi_max_out Valoarea RSSI maximă găsită (prin referință)
  * @return int Unghiul la care s-a găsit cel mai bun semnal
  */
-int det_unghi_orientare(int &rssi_max_out) {
+int det_unghi_orientare(int &rssi_max_out, int &ok_deplasare) {
         int unghi_max_rssi = 0;
-        int max_rssi = -200;
+        // int max_rssi = -200;
+        int max_rssi = 0; // valoare maxima rssi pentru zona de proximitate
         int rssi = 0;
 
         for (int unghi = interval[0]; unghi <= interval[1]; unghi += PAS_UNGHI) {
@@ -90,7 +91,7 @@ int det_unghi_orientare(int &rssi_max_out) {
             vTaskDelay(DELAY_UNGHI);
             rssi = WiFi.RSSI();
 
-            if (rssi > max_rssi) {
+            if (rssi < max_rssi) {
                 max_rssi = rssi;
                 unghi_max_rssi = unghi;
             }
@@ -102,12 +103,13 @@ int det_unghi_orientare(int &rssi_max_out) {
             vTaskDelay(DELAY_UNGHI);
             rssi = WiFi.RSSI();
 
-            if (rssi > max_rssi) {
+            if (rssi < max_rssi) {
                 max_rssi = rssi;          // actualizare valoare maxima rssi  
                 unghi_max_rssi = unghi;   // actualizare unghi cu valoarea maxim rssi
             }
         }
         rssi_max_out = max_rssi; // valoarea transmisa prin referinta
+        ok_deplasare = 1; // setare variabila pentru controlul deplasarii
         return unghi_max_rssi;
 }
 

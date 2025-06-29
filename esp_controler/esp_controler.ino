@@ -50,7 +50,7 @@ WiFiUDP udpReceiver;
 const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul UDP cu statia A
  
 // parametrii
-#define PROX_RSSI_MAX -45            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
+#define PROX_RSSI_MAX -60            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
 const int pwmMaxVal = 130;
 
 // variabile globale
@@ -83,6 +83,8 @@ portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabila
 portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabile globale
 portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;   // mutex acces variabila unghi de orientare al antenei
 unsigned long ultimaAfisare = 0;                    // variabila global de timp - afisare mesaje de debug - in conditii de test
+
+volatile int orientare_finalizata = 0; // variabila pentru controlul deplasarii cand se asteapta pentru obtinerea unghiului
 
 // instanta a structurii de date enum 
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
@@ -138,6 +140,7 @@ void taskControl_servoAntena(void *parameter) {
   while (true) {
     portENTER_CRITICAL(&muxVarG);
     int varLocal = conectareStatie;
+    ::orientare_finalizata = 0; // resetare variabila pentru controlul deplasarii
     portEXIT_CRITICAL(&muxVarG);
 
     if(varLocal == 0) {
@@ -155,12 +158,14 @@ void taskControl_servoAntena(void *parameter) {
       analogWrite(pinPWM, pwmMaxVal);
     
       // determinarea unghiului de orientare spre sursa de semnal si obtinerea valorii RSSI
+      int orientare_finalizata_local = 0; // variabila pentru controlul deplasarii
       int val_RSSI_temp = 0;
-      int val_unghi_temp = det_unghi_orientare(val_RSSI_temp);
+      int val_unghi_temp = det_unghi_orientare(val_RSSI_temp, orientare_finalizata_local);
 
       // salvare valoare rssi determinata in variabila globala
       portENTER_CRITICAL(&muxRSSI);
       valoareRSSI = val_RSSI_temp;
+      ::orientare_finalizata = orientare_finalizata_local;
       portEXIT_CRITICAL(&muxRSSI); 
       //salvare valoare unghi determinata in variabila globala
       portENTER_CRITICAL(&muxUNGHI);
@@ -250,16 +255,21 @@ void taskControl_Deplasare(void *parameter) {
         // Logica pentru urmarire
         portENTER_CRITICAL(&muxUNGHI);
         int unghiProvenienta_local = ::unghiOrientare;
+        int orientare_finalizata_local = ::orientare_finalizata; // pentru asteptarea functiei de obtinere a unghiului de deplasare
         portEXIT_CRITICAL(&muxUNGHI);
 
-        if (unghiProvenienta_local < 70) { // obiectul este in stanga
-          motoare_rotireStanga();
-          vTaskDelay(500);
-        } else if (unghiProvenienta_local > 110) { // obiectul este in dreapta
-          motoare_rotireDreapta();
-          vTaskDelay(500);
-        } else { // obiectul este in fata
-          motoare_deplasareFata();
+        if (orientare_finalizata_local) {
+          if (unghiProvenienta_local < 60) { // obiectul este in stanga
+            motoare_rotireStanga();
+            vTaskDelay(500);
+            motoare_stop();
+          } else if (unghiProvenienta_local > 120) { // obiectul este in dreapta
+            motoare_rotireDreapta();
+            vTaskDelay(500);
+            motoare_stop();
+          } else { // obiectul este in fata
+            motoare_deplasareFata();
+          }
         }
 
         break;
@@ -290,13 +300,14 @@ void taskControl_Deplasare(void *parameter) {
           // logica de deplasare in fata
           if (obiect_x_local < 30) { // obiectul este in stanga
             motoare_lateralStanga();
-            vTaskDelay(500);
+            vTaskDelay(100);
           } else if (obiect_x_local > 55) { // obiectul este in dreapta
             motoare_lateralDreapta();
-            vTaskDelay(500);
+            vTaskDelay(100);
           } else { // obiectul este in fata
             motoare_deplasareFata();
             if(obiect_y_local > 50){
+              vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
               Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
               motoare_stop();
               vTaskDelay(1000);
@@ -308,10 +319,11 @@ void taskControl_Deplasare(void *parameter) {
               Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Prindere executata, executare retragere...");
               motoare_executieRetragere(); // executie retragere
               vTaskDelay(1000);
+              motoare_stop();
+              control_stareComportamentRobot(STARE_ZONA_B);
+              vTaskResume(handleTaskComportamentRobot); // reluare task comportament
             }
           }
-          // schimbare stare comportament
-          control_stareComportamentRobot(STARE_ZONA_B);
         break;
         }
       } 
@@ -386,7 +398,7 @@ void taskComportamentRobot(void *parameter) {
       case STARE_REPAUS:
         break;
     }
-    vTaskDelay(100);
+    vTaskDelay(200);
   }
 }
 //=======================================================================================================================================================
