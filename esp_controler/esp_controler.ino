@@ -277,11 +277,11 @@ void taskControl_Deplasare(void *parameter) {
       case DEPLASARE_CAUTARE_STATIONARA:{
         // Logica pentru cautare stationara
         motoare_rotireDreapta();
-        vTaskDelay(500);
-        motoare_rotireStanga();
-        vTaskDelay(1000);
-        motoare_rotireDreapta();
-        vTaskDelay(500);
+        // vTaskDelay(500);
+        // motoare_rotireStanga();
+        // vTaskDelay(1000);
+        // motoare_rotireDreapta();
+        // vTaskDelay(500);
         break;
       }
       case DEPLASARE_POZITIONARE_OBIECT:{
@@ -398,7 +398,7 @@ void taskComportamentRobot(void *parameter) {
       case STARE_REPAUS:
         break;
     }
-    vTaskDelay(200);
+    vTaskDelay(50);
   }
 }
 //=======================================================================================================================================================
@@ -446,7 +446,7 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
       control_taskDeplasare(DEPLASARE_POZITIONARE_OBIECT);
       // dupa detectarea si pozitionarea obiectului, se trece la STARE_ZONA_B
       // comportament tratat in taskControl_Deplasare dupa ce obiectul este prins
-    } else if (RSSI > PROX_RSSI_MAX) { // conditie in care se verifica daca s-a ajuns in zona de proximitate
+    } else if (RSSI > -55) { // conditie in care se verifica daca s-a ajuns in zona de proximitate
       Serial.println("DEBUG - STARE_ZONA_A - RSSI puternic.          - Activare STATIONARA.");
       control_taskDeplasare(DEPLASARE_CAUTARE_STATIONARA);
     } else {
@@ -477,7 +477,6 @@ void handleStareZona_B(int RSSI) {
       brat_eliberare();
       motoare_executieRetragere();
       control_taskDeplasare(DEPLASARE_STOP);
-
       control_stareComportamentRobot(STARE_VERIFICARE_PREZENTA_OBIECT);
     } else {
       Serial.println("DEBUG - STARE_ZONA_B - RSSI slab.              - Activare URMARIRE.");

@@ -152,11 +152,12 @@ void motoare_executieRetragere(){
   analogWrite(pinPWM, pwmMaxVal);
   motoare_deplasareSpate();
   vTaskDelay(500);
-  analogWrite(pinPWM, 255);
+  analogWrite(pinPWM, 250);
   motoare_rotireDreapta();
-  vTaskDelay(1000);
+  vTaskDelay(1500);
   analogWrite(pinPWM, pwmMaxVal);
   motoare_stop();
+  vTaskDelay(500);
 }
 
 #endif
