@@ -34,10 +34,10 @@ brat_control.h:
 ================================================================================
 */
 
-const char versiune[] = "1.0.4"; // versiunea programului
+const char versiune[] = "1.1.0";                                    // versiunea programului - modificare logica de deplasare urmarire
 
 // date de conectare pentru statii
-const char* ssid_statie[] = {"", "Zona_A", "Zona_B", "Zona_C"};     // indexul 0 este folosit atunci cand se doreste blocarea task ului taskAntena
+const char* ssid_statie[] = {"", "Zona_A", "Zona_B", "Zona_C"};
 const char* password_statie[] = {"", "12345678", "12345678", "12345678"}; 
 
 // instante servo
@@ -51,10 +51,11 @@ const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul 
  
 // parametrii
 #define PROX_RSSI_MAX -60            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
-const int pwmMaxVal = 130;
+const int pwmMaxVal = 130;                 // valoare de PWM pentru deplasare
+const int unghiCentrareAntena = 87;       // unghiul de centrare al antenei in pozitia initiala
 
 // variabile globale
-enum StareComportament{             // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
+enum StareComportament{              // enum folosit pentru determinarea executiei comenzilor algoritmului comportamental
   STARE_VERIFICARE_PREZENTA_OBIECT,
   STARE_ZONA_A,
   STARE_ZONA_B, 
@@ -62,7 +63,7 @@ enum StareComportament{             // enum folosit pentru determinarea executie
   STARE_REPAUS
 };
 
-enum TipDeplasare{              // enum folosit pentru controlul deplasarii robotului
+enum TipDeplasare{                   // enum folosit pentru controlul deplasarii robotului
   DEPLASARE_URMARIRE, 
   DEPLASARE_CAUTARE_STATIONARA, 
   DEPLASARE_POZITIONARE_OBIECT,
@@ -72,19 +73,17 @@ enum TipDeplasare{              // enum folosit pentru controlul deplasarii robo
 volatile int conectareStatie = 0;                   // sttari posibilie {0,1,2,3} = {STOP, ZONA_A, ZONA_B, ZONA_C}
 volatile int obiect_prezent_zonaA = 0;              // pentru stocarea prezentei obiectului din ZONA_A
 volatile int unghiOrientare = 0;                    // unghiul de comanda al servo unde s-a depistat valoare maxima RSSI din intervalul de unghiuri in care s-au facut cautarile
-volatile int valoareRSSI = 0;                       // valoarea rssi masurata corespunzatoare unghiului de orientare
+volatile int proximitateRSSI = 0;                   // valoarea rssi masurata corespunzatoare unghiului de orientare
 volatile int obiect_detectat = 0;                   // inregistreaza prezenta obiectului din zona A
 volatile int obiect_x = 0;                          // coordonate x al obiectului detectat
 volatile int obiect_y = 0;                          // coordonate y al obiectului detectat
 volatile int obiect_w = 0;                          // coordonate w al obiectului detectat
 volatile int obiect_h = 0;                          // coordonate h al obiectului detectat
+
 portMUX_TYPE muxUART = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabile prin uart
 portMUX_TYPE muxRSSI = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabila RSSI
 portMUX_TYPE muxVarG = portMUX_INITIALIZER_UNLOCKED;    // mutex acces variabile globale
 portMUX_TYPE muxUNGHI = portMUX_INITIALIZER_UNLOCKED;   // mutex acces variabila unghi de orientare al antenei
-unsigned long ultimaAfisare = 0;                    // variabila global de timp - afisare mesaje de debug - in conditii de test
-
-volatile int orientare_finalizata = 0; // variabila pentru controlul deplasarii cand se asteapta pentru obtinerea unghiului
 
 // instanta a structurii de date enum 
 StareComportament stareComport_Robot = STARE_VERIFICARE_PREZENTA_OBIECT;
@@ -95,7 +94,6 @@ TaskHandle_t handleTaskControl_servoAntena = NULL;
 TaskHandle_t handleTaskComportamentRobot = NULL;
 TaskHandle_t handleTaskCitireUART = NULL;
 TaskHandle_t handleTaskDeplasare = NULL;
-
 
 //=======================================================================================================================================================
 void setup() {
@@ -115,16 +113,16 @@ void setup() {
   delay(500);
   init_brat(); // initializare brat
 
-  servoAntena.write(50);
+  servoAntena.write(0);
   delay(500);
-  servoAntena.write(140);
+  servoAntena.write(180);
   delay(500);
-  servoAntena.write(90);
+  servoAntena.write(unghiCentrareAntena);
 
   // initializarea conectiune cu o statie care nu exista
   conectareStatie = 0; 
+
   // initializare tasks
-  // stare finala
   initTaskuri();
   delay(1000);
 
@@ -140,15 +138,15 @@ void taskControl_servoAntena(void *parameter) {
   while (true) {
     portENTER_CRITICAL(&muxVarG);
     int varLocal = conectareStatie;
-    ::orientare_finalizata = 0; // resetare variabila pentru controlul deplasarii
     portEXIT_CRITICAL(&muxVarG);
 
     if(varLocal == 0) {
       vTaskDelay(50);
       continue;
     }
+
     if (WiFi.status() != WL_CONNECTED || WiFi.SSID() != ssid_statie[varLocal]) { // daca nu este conectat, se incearca conectarea la statia curenta din pasul comportamental
-      servoAntena.write(90);                                                     // pozitionare antena in pozitie default
+      servoAntena.write(unghiCentrareAntena);                                                     // pozitionare antena in pozitie default
       connect_statie(ssid_statie[varLocal], password_statie[varLocal]);          // conectare la statia curenta
       Serial.print("DEBUG - taskControl_servoAntena - Conectare la statia: "); Serial.println(ssid_statie[varLocal]);
       Serial.println("DEBUG - taskControl_servoAntena - activare handleTaskComportamentRobot");
@@ -157,23 +155,12 @@ void taskControl_servoAntena(void *parameter) {
       // activare roti daca robotul este conectat la o statie
       analogWrite(pinPWM, pwmMaxVal);
     
-      // determinarea unghiului de orientare spre sursa de semnal si obtinerea valorii RSSI
-      int orientare_finalizata_local = 0; // variabila pentru controlul deplasarii
-      int val_RSSI_temp = 0;
-      int val_unghi_temp = det_unghi_orientare(val_RSSI_temp, orientare_finalizata_local);
+      // determinarea valorii RSSI pentru proximitate
+      int val_RSSI_temp = WiFi.RSSI(); // valoare RSSI pentru proximitate
 
-      // salvare valoare rssi determinata in variabila globala
       portENTER_CRITICAL(&muxRSSI);
-      valoareRSSI = val_RSSI_temp;
-      ::orientare_finalizata = orientare_finalizata_local;
-      portEXIT_CRITICAL(&muxRSSI); 
-      //salvare valoare unghi determinata in variabila globala
-      portENTER_CRITICAL(&muxUNGHI);
-      unghiOrientare = val_unghi_temp;
-      portEXIT_CRITICAL(&muxUNGHI);
-
-      Serial.print("DEBUG - taskControl_servoAntena - unghi: ");
-      Serial.println(val_unghi_temp); // FOLOSIT PENTRU TEST
+      proximitateRSSI = val_RSSI_temp; // salvare valoare rssi in variabila globala
+      portEXIT_CRITICAL(&muxRSSI);
 
       // verificare daca obiectul este prezent in zona A
       verificare_obiect_zonaA();
@@ -245,46 +232,52 @@ void taskControl_Deplasare(void *parameter) {
     portENTER_CRITICAL(&muxVarG);
     TipDeplasare tipDeplasare_Robot_local = ::tipDeplasare_Robot; // actualizare tip deplasare
     portEXIT_CRITICAL(&muxVarG);
+
     switch (tipDeplasare_Robot_local) {
       case DEPLASARE_STOP:{
         // Logica pentru stationare
         motoare_stop();
         break;
       }
+
       case DEPLASARE_URMARIRE:{
-        // Logica pentru urmarire
+        motoare_stop(); // oprire motoare inainte de orientare
+        
+        // Logica pentru urmarire   
+        int rssi_temp = 0;
+        
+        int unghiProvenienta = det_unghi_orientare(rssi_temp);
+
         portENTER_CRITICAL(&muxUNGHI);
-        int unghiProvenienta_local = ::unghiOrientare;
-        int orientare_finalizata_local = ::orientare_finalizata; // pentru asteptarea functiei de obtinere a unghiului de deplasare
+        ::proximitateRSSI = rssi_temp;        // salvare valoare rssi in variabila globala
+        ::unghiOrientare = unghiProvenienta;  // salvare valoare unghi in variabila globala pentru debuging
         portEXIT_CRITICAL(&muxUNGHI);
 
-        if (orientare_finalizata_local) {
-          if (unghiProvenienta_local < 60) { // obiectul este in stanga
-            motoare_rotireStanga();
-            vTaskDelay(500);
-            motoare_stop();
-          } else if (unghiProvenienta_local > 120) { // obiectul este in dreapta
-            motoare_rotireDreapta();
-            vTaskDelay(500);
-            motoare_stop();
-          } else { // obiectul este in fata
-            motoare_deplasareFata();
-          }
+        if (unghiProvenienta < 50) {         // obiectul este in stanga
+          motoare_rotireStanga();
+          vTaskDelay(500);
+          motoare_stop();
+        } else if (unghiProvenienta > 130) { // obiectul este in dreapta
+          motoare_rotireDreapta();
+          vTaskDelay(500);
+          motoare_stop();
+        } else {                             // obiectul este in fata
+          motoare_deplasareFata();
+          vTaskDelay(500);
+          motoare_stop();
         }
-
         break;
       }
+
       case DEPLASARE_CAUTARE_STATIONARA:{
         // Logica pentru cautare stationara
         motoare_rotireDreapta();
-        // vTaskDelay(500);
-        // motoare_rotireStanga();
-        // vTaskDelay(1000);
-        // motoare_rotireDreapta();
-        // vTaskDelay(500);
+
         break;
       }
+
       case DEPLASARE_POZITIONARE_OBIECT:{
+       //vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
         // Logica pentru pozitionare obiect
         portENTER_CRITICAL(&muxUART);
         int obiect_detectat_local = ::obiect_detectat;
@@ -297,36 +290,44 @@ void taskControl_Deplasare(void *parameter) {
         // logica de pozitionarea robotului pe traiectoria obiectului
         if (obiect_detectat_local) {
           Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect detectat, pozitionare robot...");
+          
           // logica de deplasare in fata
           if (obiect_x_local < 30) { // obiectul este in stanga
+            Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in stanga, deplasare laterala stanga...");
             motoare_lateralStanga();
-            vTaskDelay(100);
+            vTaskDelay(200);
+            motoare_stop();
+            vTaskDelay(500);
           } else if (obiect_x_local > 55) { // obiectul este in dreapta
+            Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in dreapta, deplasare laterala dreapta...");
             motoare_lateralDreapta();
-            vTaskDelay(100);
+            vTaskDelay(200);
+            motoare_stop();
+            vTaskDelay(500);
           } else { // obiectul este in fata
             motoare_deplasareFata();
-            if(obiect_y_local > 50){
-              vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
-              Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
-              motoare_stop();
-              vTaskDelay(1000);
-              motoare_deplasareFata();
-              vTaskDelay(1000);
-              motoare_stop();
-              brat_prindere(); // executie prindere
-              vTaskDelay(1000);
-              Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Prindere executata, executare retragere...");
-              motoare_executieRetragere(); // executie retragere
-              vTaskDelay(1000);
-              motoare_stop();
-              control_stareComportamentRobot(STARE_ZONA_B);
-              vTaskResume(handleTaskComportamentRobot); // reluare task comportament
-            }
+            vTaskDelay(200);
           }
-        break;
+
+          if(obiect_y_local > 50){
+            //vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
+            Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
+            motoare_stop();
+            vTaskDelay(1000);
+            motoare_deplasareFata();
+            vTaskDelay(1000);
+            motoare_stop();
+            brat_prindere(); // executie prindere
+            vTaskDelay(1000);
+            motoare_executieRetragere(); // executie retragere
+            vTaskDelay(1000);
+            motoare_stop();
+            control_stareComportamentRobot(STARE_ZONA_B);
+            //vTaskResume(handleTaskComportamentRobot);
+          }
         }
-      } 
+        break;
+      }
       default:
         motoare_stop();
         break;
@@ -352,7 +353,7 @@ void taskComportamentRobot(void *parameter) {
     portEXIT_CRITICAL(&muxVarG);
 
     portENTER_CRITICAL(&muxRSSI);
-    int rssi_local = ::valoareRSSI;
+    int rssi_local = ::proximitateRSSI;
     int unghiProvenienta_local = ::unghiOrientare;
     portEXIT_CRITICAL(&muxRSSI);
 
@@ -398,7 +399,7 @@ void taskComportamentRobot(void *parameter) {
       case STARE_REPAUS:
         break;
     }
-    vTaskDelay(50);
+    vTaskDelay(100);
   }
 }
 //=======================================================================================================================================================
@@ -583,7 +584,7 @@ void asteptareReconectare(int conectareStare_local){
   ::conectareStatie = conectareStare_local;
   portEXIT_CRITICAL(&muxVarG); 
 
-  servoAntena.write(90);
+  servoAntena.write(unghiCentrareAntena);
 
 
   vTaskSuspend(handleTaskComportamentRobot);
@@ -643,7 +644,7 @@ void setup_pini() {
   servoHead.attach(pinServoHead);
 
   delay(100);
-  servoAntena.write(90);
+  servoAntena.write(unghiCentrareAntena);
 }
 //=======================================================================================================================================================
 /**

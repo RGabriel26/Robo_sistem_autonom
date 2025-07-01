@@ -15,10 +15,10 @@
 // ========================
 
 #define DELAY_MOVE_ARM 200                ///< Delay între mișcările bratului [ms]
-#define POZ_SERVO_BASE_DEFAULT 35         ///< Poziție implicită a bazei (coborât)
-#define POZ_SERVO_HEAD_DEFAULT 20         ///< Poziție implicită a efectorului (deschis)
-#define POZ_SERVO_BASE_RIDICAT 0         ///< Poziție ridicată a bazei
-#define POZ_SERVO_HEAD_RIDICAT 45         ///< Poziție închisă a efectorului (pentru prindere)
+#define POZ_SERVO_BASE_DEFAULT 30         ///< Poziție implicită a bazei (coborât)
+#define POZ_SERVO_HEAD_DEFAULT 15         ///< Poziție implicită a efectorului (deschis)
+#define POZ_SERVO_BASE_RIDICAT 10         ///< Poziție ridicată a bazei
+#define POZ_SERVO_HEAD_RIDICAT 40         ///< Poziție închisă a efectorului (pentru prindere)
 
 // ========================
 // VARIABILE EXTERNE

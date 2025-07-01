@@ -22,6 +22,7 @@
 // pin pentru control PWM general
 #define pinPWM 26
 
+// valori externe
 extern const int pwmMaxVal;
 
 /**
@@ -98,7 +99,7 @@ void motoare_rotireDreapta() {
  * Activează toate motoarele pentru a realiza o mișcare laterală stânga.
  */
 void motoare_lateralStanga() {
-  analogWrite(pinPWM, pwmMaxVal);
+  analogWrite(pinPWM, 100);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -115,7 +116,7 @@ void motoare_lateralStanga() {
  * Activează toate motoarele pentru a realiza o mișcare laterală dreapta.
  */
 void motoare_lateralDreapta() {
-  analogWrite(pinPWM, pwmMaxVal);
+  analogWrite(pinPWM, 100);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);

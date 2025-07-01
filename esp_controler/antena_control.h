@@ -9,17 +9,17 @@
 // DEFINIRE PINI
 // ========================
 
-#define pinServoAntena 4 ///< Pinul de control al servomotorului antenei
+#define pinServoAntena 17 ///< Pinul de control al servomotorului antenei
 
 // ========================
 // SETĂRI FUNCȚIONARE
 // ========================
 
-#define DELAY_UNGHI 100       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
+#define DELAY_UNGHI 200       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
 #define PAS_UNGHI 30         ///< Incrementul unghiului de scanare
 
-#define LIM_INF 20           ///< Limită inferioară pentru unghiul de scanare
-#define LIM_SUP 160          ///< Limită superioară pentru unghiul de scanare
+#define LIM_INF 10           ///< Limită inferioară pentru unghiul de scanare
+#define LIM_SUP 170          ///< Limită superioară pentru unghiul de scanare
 
 // ========================
 // VARIABILE EXTERNE
@@ -40,6 +40,9 @@ extern const unsigned int localPort;
 /// Indexul curent al stației la care se face conectarea (0 = dezactivat)
 extern volatile int conectareStatie;
 
+/// Valoare de centrare a antenei
+extern const int unghiCentrareAntena;
+
 // ========================
 // VARIABILE INTERNE
 // ========================
@@ -55,9 +58,9 @@ static int interval[2] = {LIM_INF, LIM_SUP}; ///< Intervalul de scanare a unghiu
  * @param password Parola rețelei
  */
 void connect_statie(const char* ssid, const char* password) {
-    dacWrite(pinPWM, 0);
-    WiFi.disconnect();
+    analogWrite(pinPWM, 0); // dezactivare motoare prin PWM
     udpReceiver.stop();
+    WiFi.disconnect();
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
     Serial.print("\nDEBUG - connect_statie - Asteptare pentru conexiunea la SSID: "); Serial.println(ssid);
@@ -77,13 +80,13 @@ void connect_statie(const char* ssid, const char* password) {
  * măsoară semnalul RSSI și determină unghiul unde semnalul este maxim.
  * Intervalul este apoi restrâns dinamic.
  * 
- * @param[out] rssi_max_out Valoarea RSSI maximă găsită (prin referință)
+ * @param[out] rssi_max_out Valoarea RSSI găsită (prin referință)
  * @return int Unghiul la care s-a găsit cel mai bun semnal
  */
-int det_unghi_orientare(int &rssi_max_out, int &ok_deplasare) {
+int det_unghi_orientare(int &rssi_max_out) {
         int unghi_max_rssi = 0;
-        // int max_rssi = -200;
-        int max_rssi = 0; // valoare maxima rssi pentru zona de proximitate
+        // int max_rssi = 0; // valoare maxima rssi pentru zona de proximitate
+        int max_rssi = -200;
         int rssi = 0;
 
         for (int unghi = interval[0]; unghi <= interval[1]; unghi += PAS_UNGHI) {
@@ -91,7 +94,8 @@ int det_unghi_orientare(int &rssi_max_out, int &ok_deplasare) {
             vTaskDelay(DELAY_UNGHI);
             rssi = WiFi.RSSI();
 
-            if (rssi < max_rssi) {
+            // if (rssi < max_rssi) {
+            if (rssi > max_rssi) {
                 max_rssi = rssi;
                 unghi_max_rssi = unghi;
             }
@@ -103,13 +107,16 @@ int det_unghi_orientare(int &rssi_max_out, int &ok_deplasare) {
             vTaskDelay(DELAY_UNGHI);
             rssi = WiFi.RSSI();
 
-            if (rssi < max_rssi) {
-                max_rssi = rssi;          // actualizare valoare maxima rssi  
+            // if (rssi < max_rssi) {
+            if (rssi > max_rssi) {
+                max_rssi = rssi;          // actualizare valoare maxima rssi
                 unghi_max_rssi = unghi;   // actualizare unghi cu valoarea maxim rssi
             }
         }
         rssi_max_out = max_rssi; // valoarea transmisa prin referinta
-        ok_deplasare = 1; // setare variabila pentru controlul deplasarii
+
+        servoAntena.write(unghiCentrareAntena);
+        
         return unghi_max_rssi;
 }
 

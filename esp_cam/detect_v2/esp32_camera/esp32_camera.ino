@@ -26,7 +26,6 @@
 /* Includes ---------------------------------------------------------------- */
 #include <ROBO_licenta_inferencing.h>
 #include "edge-impulse-sdk/dsp/image/image.hpp"
-#include <HardwareSerial.h>
 
 #include "esp_camera.h"
 
@@ -211,7 +210,7 @@ void loop()
                 bb.height);
         // verificarea daca s-a detectat obiectul dorit si impachetarea coordonatelor pentru a fi trimise
         if (bb.label == "obiect"){
-            if(bb.value < 0.8) {
+            if(bb.value < 0.5) {
                 ei_printf("Detected object with low confidence, skipping sending data.\r\n");
                 continue;
             }
