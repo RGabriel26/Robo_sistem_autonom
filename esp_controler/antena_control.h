@@ -15,7 +15,7 @@
 // SETĂRI FUNCȚIONARE
 // ========================
 
-#define DELAY_UNGHI 200       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
+#define DELAY_UNGHI 150       ///< Timp de așteptare între poziționări succesive ale antenei [ms]
 #define PAS_UNGHI 30         ///< Incrementul unghiului de scanare
 
 #define LIM_INF 10           ///< Limită inferioară pentru unghiul de scanare
