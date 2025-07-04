@@ -99,7 +99,7 @@ void motoare_rotireDreapta() {
  * Activează toate motoarele pentru a realiza o mișcare laterală stânga.
  */
 void motoare_lateralStanga() {
-  analogWrite(pinPWM, 100);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, LOW);
   digitalWrite(DRIVER_A_IN2, HIGH);
   digitalWrite(DRIVER_A_IN3, HIGH);
@@ -116,7 +116,7 @@ void motoare_lateralStanga() {
  * Activează toate motoarele pentru a realiza o mișcare laterală dreapta.
  */
 void motoare_lateralDreapta() {
-  analogWrite(pinPWM, 100);
+  analogWrite(pinPWM, pwmMaxVal);
   digitalWrite(DRIVER_A_IN1, HIGH);
   digitalWrite(DRIVER_A_IN2, LOW);
   digitalWrite(DRIVER_A_IN3, LOW);
@@ -152,11 +152,9 @@ void motoare_stop() {
 void motoare_executieRetragere(){
   analogWrite(pinPWM, pwmMaxVal);
   motoare_deplasareSpate();
-  vTaskDelay(500);
-  analogWrite(pinPWM, 250);
+  vTaskDelay(300);
   motoare_rotireDreapta();
-  vTaskDelay(1500);
-  analogWrite(pinPWM, pwmMaxVal);
+  vTaskDelay(1000);
   motoare_stop();
   vTaskDelay(500);
 }

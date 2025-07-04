@@ -85,8 +85,8 @@ void connect_statie(const char* ssid, const char* password) {
  */
 int det_unghi_orientare(int &rssi_max_out) {
         int unghi_max_rssi = 0;
-        // int max_rssi = 0; // valoare maxima rssi pentru zona de proximitate
-        int max_rssi = -200;
+        int max_rssi = 0; // valoare maxima rssi pentru zona de proximitate
+        //int max_rssi = -200;
         int rssi = 0;
 
         for (int unghi = interval[0]; unghi <= interval[1]; unghi += PAS_UNGHI) {
@@ -94,8 +94,8 @@ int det_unghi_orientare(int &rssi_max_out) {
             vTaskDelay(DELAY_UNGHI);
             rssi = WiFi.RSSI();
 
-            // if (rssi < max_rssi) {
-            if (rssi > max_rssi) {
+            if (rssi < max_rssi) {
+            //if (rssi > max_rssi) {
                 max_rssi = rssi;
                 unghi_max_rssi = unghi;
             }
@@ -107,8 +107,8 @@ int det_unghi_orientare(int &rssi_max_out) {
             vTaskDelay(DELAY_UNGHI);
             rssi = WiFi.RSSI();
 
-            // if (rssi < max_rssi) {
-            if (rssi > max_rssi) {
+            if (rssi < max_rssi) {
+            //if (rssi > max_rssi) {
                 max_rssi = rssi;          // actualizare valoare maxima rssi
                 unghi_max_rssi = unghi;   // actualizare unghi cu valoarea maxim rssi
             }

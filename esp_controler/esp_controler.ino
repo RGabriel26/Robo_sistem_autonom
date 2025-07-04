@@ -50,7 +50,7 @@ WiFiUDP udpReceiver;
 const unsigned int localPort = 4210; // port pentru comunicarea prin protocolul UDP cu statia A
  
 // parametrii
-#define PROX_RSSI_MAX -60            // parametru de prag pentru determinarea zonei de proximitate fata de o statie
+#define PROX_RSSI_MAX -55           // parametru de prag pentru determinarea zonei de proximitate fata de o statie
 const int pwmMaxVal = 130;                 // valoare de PWM pentru deplasare
 const int unghiCentrareAntena = 87;       // unghiul de centrare al antenei in pozitia initiala
 
@@ -253,13 +253,13 @@ void taskControl_Deplasare(void *parameter) {
         ::unghiOrientare = unghiProvenienta;  // salvare valoare unghi in variabila globala pentru debuging
         portEXIT_CRITICAL(&muxUNGHI);
 
-        if (unghiProvenienta < 50) {         // obiectul este in stanga
+        if (unghiProvenienta < 20) {         // obiectul este in stanga
           motoare_rotireStanga();
-          vTaskDelay(500);
+          vTaskDelay(300);
           motoare_stop();
-        } else if (unghiProvenienta > 130) { // obiectul este in dreapta
+        } else if (unghiProvenienta > 160) { // obiectul este in dreapta
           motoare_rotireDreapta();
-          vTaskDelay(500);
+          vTaskDelay(300);
           motoare_stop();
         } else {                             // obiectul este in fata
           motoare_deplasareFata();
@@ -306,24 +306,22 @@ void taskControl_Deplasare(void *parameter) {
             vTaskDelay(500);
           } else { // obiectul este in fata
             motoare_deplasareFata();
-            vTaskDelay(200);
-          }
-
-          if(obiect_y_local > 50){
-            //vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
-            Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
-            motoare_stop();
-            vTaskDelay(1000);
-            motoare_deplasareFata();
-            vTaskDelay(1000);
-            motoare_stop();
-            brat_prindere(); // executie prindere
-            vTaskDelay(1000);
-            motoare_executieRetragere(); // executie retragere
-            vTaskDelay(1000);
-            motoare_stop();
-            control_stareComportamentRobot(STARE_ZONA_B);
-            //vTaskResume(handleTaskComportamentRobot);
+            if(obiect_y_local > 50){
+              //vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
+              Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
+              motoare_stop();
+              vTaskDelay(1000);
+              motoare_deplasareFata();
+              vTaskDelay(1000);
+              motoare_stop();
+              brat_prindere(); // executie prindere
+              vTaskDelay(1000);
+              motoare_executieRetragere(); // executie retragere
+              vTaskDelay(1000);
+              motoare_stop();
+              control_stareComportamentRobot(STARE_ZONA_B);
+              //vTaskResume(handleTaskComportamentRobot);
+            }
           }
         }
         break;
@@ -695,6 +693,7 @@ void initTaskuri(){
     &handleTaskComportamentRobot,
     1               // core 1
   );
+  //vTaskSuspend(handleTaskComportamentRobot); // suspendare initiala a taskului de comportament al robotului
 }
 //=======================================================================================================================================================
 /**
@@ -704,4 +703,68 @@ void loop(){
   // Nu este necesară o funcție loop() în acest sistem, deoarece toate operațiunile sunt gestionate de task-uri FreeRTOS.
   // Task-urile rulează în fundal și gestionează comportamentul robotului.
   vTaskDelay(1000); // Delay pentru a evita blocarea CPU, dacă este necesar.
+
+  //   // Verifică dacă toate taskurile sunt suspendate
+  // if (eTaskGetState(handleTaskComportamentRobot) == eSuspended) {
+    
+
+  //   /* aici vreau sa se citeasca o valoare de la tastatura prin uart
+  //   iar poentru fiecare caracter primit, care va fi un numar sa se execute una din comenzile destinate controlului motoarelor astfel:
+  //   0 - oprire
+  //   1 - deplasare fata
+  //   2 - deplasare spate
+  //   3 - rotire stanga
+  //   4 - rotire dreapta
+  //   5 - deplasare laterala stanga
+  //   6 - deplasare laterala dreapta
+  //   */
+  //   if (Serial.available()) {
+  //     char comanda = Serial.read();
+  //       switch (comanda) {
+  //         case '0':
+  //           delay(2000);
+  //           motoare_stop();
+  //           break;
+  //         case '1':
+  //           delay(2000);
+  //           motoare_deplasareFata();
+  //           break;
+  //         case '2':
+  //           delay(2000);
+  //           motoare_deplasareSpate();
+  //           break;
+  //         case '3':
+  //           delay(2000);
+  //           motoare_rotireStanga();
+  //           break;
+  //         case '4':
+  //           delay(2000);
+  //           motoare_rotireDreapta();
+  //           break;
+  //         case '5':
+  //           delay(2000);
+  //           motoare_lateralStanga();
+  //           break;
+  //         case '6':
+  //           delay(2000);
+  //           motoare_lateralDreapta();
+  //           break;
+  //         case '7':
+  //           delay(2000);
+  //           brat_prindere();
+  //           break;
+  //         case '8':
+  //           delay(2000);
+  //           brat_eliberare();
+  //           break;  
+  //         default:
+  //           Serial.println("Comanda necunoscuta!");
+  //       }
+
+  //     delay(2000);
+  //     motoare_stop();
+  //   }
+
+  // }
+
 }
