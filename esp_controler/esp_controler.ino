@@ -34,7 +34,7 @@ brat_control.h:
 ================================================================================
 */
 
-const char versiune[] = "1.1.0";                                    // versiunea programului - modificare logica de deplasare urmarire
+const char versiune[] = "1.1.1";                                    // versiunea programului - modificare logica de deplasare urmarire
 
 // date de conectare pentru statii
 const char* ssid_statie[] = {"", "Zona_A", "Zona_B", "Zona_C"};
@@ -306,14 +306,15 @@ void taskControl_Deplasare(void *parameter) {
             vTaskDelay(500);
           } else { // obiectul este in fata
             motoare_deplasareFata();
-            if(obiect_y_local > 50){
+            if(obiect_y_local > 60){
               //vTaskSuspend(handleTaskComportamentRobot); // suspendare task comportament pentru a evita conflicte
               Serial.println("DEBUG - DEPLASARE_POZITIONARE_OBIECT - Obiect in pozitie de prindere, executare prindere...");
               motoare_stop();
               vTaskDelay(1000);
               motoare_deplasareFata();
-              vTaskDelay(1000);
+              vTaskDelay(100);
               motoare_stop();
+              vTaskDelay(500);
               brat_prindere(); // executie prindere
               vTaskDelay(1000);
               motoare_executieRetragere(); // executie retragere
@@ -321,6 +322,9 @@ void taskControl_Deplasare(void *parameter) {
               motoare_stop();
               control_stareComportamentRobot(STARE_ZONA_B);
               //vTaskResume(handleTaskComportamentRobot);
+            }else{
+              vTaskDelay(500); 
+              motoare_stop();
             }
           }
         }
@@ -445,9 +449,9 @@ void handleStareZona_A(int RSSI, int obiect_detectat) {
       control_taskDeplasare(DEPLASARE_POZITIONARE_OBIECT);
       // dupa detectarea si pozitionarea obiectului, se trece la STARE_ZONA_B
       // comportament tratat in taskControl_Deplasare dupa ce obiectul este prins
-    } else if (RSSI > -55) { // conditie in care se verifica daca s-a ajuns in zona de proximitate
+    } else if (RSSI > PROX_RSSI_MAX) { // conditie in care se verifica daca s-a ajuns in zona de proximitate
       Serial.println("DEBUG - STARE_ZONA_A - RSSI puternic.          - Activare STATIONARA.");
-      control_taskDeplasare(DEPLASARE_CAUTARE_STATIONARA);
+      // control_taskDeplasare(DEPLASARE_CAUTARE_STATIONARA);
     } else {
       Serial.println("DEBUG - STARE_ZONA_A - RSSI slab.              - Activare URMARIRE.");
       control_taskDeplasare(DEPLASARE_URMARIRE);
@@ -473,10 +477,15 @@ void handleStareZona_B(int RSSI) {
   if (isConnectedToStation(2)) {
     if (RSSI > PROX_RSSI_MAX) {
       Serial.println("DEBUG - STARE_ZONA_B - Executare eliberare.");
+      motoare_stop(); 
+      vTaskDelay(500);
       brat_eliberare();
+      vTaskDelay(500);
       motoare_executieRetragere();
-      control_taskDeplasare(DEPLASARE_STOP);
+      vTaskDelay(1000);
       control_stareComportamentRobot(STARE_VERIFICARE_PREZENTA_OBIECT);
+      vTaskDelay(500);
+      control_taskDeplasare(DEPLASARE_STOP);
     } else {
       Serial.println("DEBUG - STARE_ZONA_B - RSSI slab.              - Activare URMARIRE.");
       control_taskDeplasare(DEPLASARE_URMARIRE);
@@ -500,7 +509,7 @@ void handleStareZona_C(int RSSI, int obiect_prezent) {
   portEXIT_CRITICAL(&muxVarG);
 
   if (isConnectedToStation(3)) {
-    if (RSSI > PROX_RSSI_MAX) {
+    if (RSSI > -50) {
       Serial.println("DEBUG - STARE_ZONA_C - PROXIMITATE - Oprire si asteptare prezenta obiect.");
       // verificare prezenta obiect zona A
       // stabilire conectare statia A
